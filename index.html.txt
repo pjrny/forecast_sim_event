@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Festival Forecast Simulator (Gemini Powered)</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Dark background */
+            color: #c9d1d9; /* Light text */
+        }
+        .card {
+            background-color: #161b22; /* Slightly lighter dark card background */
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        .input-field {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+        }
+        .btn-primary {
+            background-color: #238636;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold text-white mb-6 text-center">Event Forecast Simulator</h1>
+        <p class="text-center text-gray-400 mb-8">Input your event variables to generate a detailed financial forecast, competitor analysis, and creative content using the Gemini API.</p>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- INPUT PANEL (Col 1) -->
+            <div class="lg:col-span-1 card rounded-xl p-6 h-fit sticky top-8">
+                <h2 class="text-xl font-bold mb-4 text-white">Event Variables</h2>
+                <form id="forecast-form" class="space-y-4">
+                    <!-- Event Details -->
+                    <div>
+                        <label for="event-name" class="block text-sm font-medium">Event Name</label>
+                        <input type="text" id="event-name" value="Rave Utopia" class="input-field mt-1 block w-full rounded-lg p-2" required>
+                    </div>
+                    <div>
+                        <label for="genre" class="block text-sm font-medium">Genre</label>
+                        <select id="genre" class="input-field mt-1 block w-full rounded-lg p-2">
+                            <option value="EDM">EDM / Electronic</option>
+                            <option value="Rock">Rock / Indie</option>
+                            <option value="Hip Hop">Hip Hop</option>
+                            <option value="Country">Country</option>
+                            <option value="Art & Wine">Art & Wine</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="city" class="block text-sm font-medium">City</label>
+                            <input type="text" id="city" value="Austin" class="input-field mt-1 block w-full rounded-lg p-2" required>
+                        </div>
+                        <div>
+                            <label for="state" class="block text-sm font-medium">State/Country</label>
+                            <input type="text" id="state" value="TX, US" class="input-field mt-1 block w-full rounded-lg p-2" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Financial Inputs -->
+                    <h3 class="text-lg font-semibold pt-4 text-white">Financial Goals</h3>
+                    <div>
+                        <label for="attendance-goal" class="block text-sm font-medium">Target Attendance</label>
+                        <input type="number" id="attendance-goal" value="6500" min="1000" class="input-field mt-1 block w-full rounded-lg p-2" required>
+                    </div>
+                    <div>
+                        <label for="avg-ticket-price" class="block text-sm font-medium">Average Ticket Price ($)</label>
+                        <input type="number" id="avg-ticket-price" value="265" min="50" step="5" class="input-field mt-1 block w-full rounded-lg p-2" required>
+                    </div>
+                    <div>
+                        <label for="sponsorship-goal" class="block text-sm font-medium">Sponsorship Revenue Goal ($)</label>
+                        <input type="number" id="sponsorship-goal" value="150000" min="0" step="1000" class="input-field mt-1 block w-full rounded-lg p-2" required>
+                    </div>
+                    
+                    <!-- Creative Input -->
+                    <h3 class="text-lg font-semibold pt-4 text-white">Creative Inputs (Optional)</h3>
+                    <div>
+                        <label for="artist-lineup" class="block text-sm font-medium">Artist Lineup (Comma Separated)</label>
+                        <textarea id="artist-lineup" rows="3" class="input-field mt-1 block w-full rounded-lg p-2" placeholder="Ex: Fred again.., Skrillex, Kaskade, RL Grime"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">If provided, an AI lineup graphic will be generated.</p>
+                    </div>
+
+                    <button type="submit" id="generate-button" class="btn-primary w-full text-white font-bold py-3 rounded-xl mt-6">
+                        Generate Event Forecast
+                    </button>
+                    <div id="loading-indicator" class="hidden text-center text-green-400 mt-4">
+                        <svg class="animate-spin h-5 w-5 mr-3 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Analyzing data and generating AI content...
+                    </div>
+                </form>
+            </div>
+            
+            <!-- OUTPUT PANELS (Col 2 & 3) -->
+            <div class="lg:col-span-2 space-y-8">
+
+                <!-- 1. FINANCIAL SUMMARY -->
+                <div class="card rounded-xl p-6">
+                    <h2 class="text-2xl font-bold mb-4 text-white">?? Financial Summary & Detailed Breakdown</h2>
+                    <div id="financial-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-6">
+                        <div class="p-3 bg-gray-800 rounded-lg">
+                            <div class="text-xs text-gray-400">Attendees</div>
+                            <div id="out-attendees" class="text-xl font-bold text-yellow-300">0</div>
+                        </div>
+                        <div class="p-3 bg-gray-800 rounded-lg">
+                            <div class="text-xs text-gray-400">Total Revenue</div>
+                            <div id="out-revenue" class="text-xl font-bold text-green-400">$0</div>
+                        </div>
+                        <div class="p-3 bg-gray-800 rounded-lg">
+                            <div class="text-xs text-gray-400">Total Expense</div>
+                            <div id="out-expense" class="text-xl font-bold text-red-400">$0</div>
+                        </div>
+                        <div class="p-3 bg-gray-800 rounded-lg">
+                            <div class="text-xs text-gray-400">Net Profit</div>
+                            <div id="out-profit" class="text-xl font-bold text-blue-400">$0</div>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3 text-white">AI Financial Forecast Narrative</h3>
+                    <div id="forecast-narrative" class="markdown-content text-gray-300">
+                        <p>Input your variables and click 'Generate Event Forecast' to receive a detailed financial and strategic narrative.</p>
+                    </div>
+                </div>
+
+                <!-- 2. COMPETITOR & CONFESSIONS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Competitor Analysis -->
+                    <div class="card rounded-xl p-6">
+                        <h2 class="text-2xl font-bold mb-4 text-white">?? Competitor Analysis</h2>
+                        <div id="competitor-analysis" class="markdown-content text-gray-300">
+                            <p>The AI will identify and analyze the top 3 competitive events in your market/genre from the provided database.</p>
+                        </div>
+                    </div>
+                    <!-- Funny Confessions -->
+                    <div class="card rounded-xl p-6">
+                        <h2 class="text-2xl font-bold mb-4 text-white">?? Funny Event Confessions</h2>
+                        <div id="funny-confessions" class="markdown-content text-gray-300">
+                            <p>Based on your event type, the AI will generate humorous attendee confessions inspired by the EDM Confessions database.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. LINEUP GRAPHIC -->
+                <div class="card rounded-xl p-6">
+                    <h2 class="text-2xl font-bold mb-4 text-white">??? Lineup Graphic Generator</h2>
+                    <div id="lineup-graphic-output" class="flex justify-center items-center w-full min-h-64 bg-gray-800 rounded-lg p-4">
+                        <p id="graphic-placeholder" class="text-gray-500 text-center">Input an artist lineup above to generate a professional-style festival graphic.</p>
+                        <img id="lineup-image" src="" alt="Generated Festival Lineup Graphic" class="hidden max-w-full h-auto rounded-lg" onerror="this.onerror=null; this.src=''; document.getElementById('lineup-image').classList.add('hidden'); document.getElementById('graphic-placeholder').classList.remove('hidden');">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- API CONFIGURATION ---
+        // NOTE: The API key is intentionally left blank. The execution environment (Canvas) provides it securely at runtime.
+        const API_KEY = ""; 
+        const TEXT_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        // Using imagen-3.0-generate-002 for image generation
+        const IMAGE_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
+
+        // --- EMBEDDED DATA FROM UPLOADED FILES ---
+
+        // 1. FESTIVAL WIZARD OSCAR LIST (For Competitor Analysis) - Sanitized and condensed for LLM context
+        const FESTIVAL_WIZARD_DATA = `
+festival_series_name,city,state,country_abbr,avg_attendance,category_name,subcategory_name
+Woodstock Art & Wine Festival,Woodstock,GA,US,,Art,~All (Art)
+Zermatt Unplugged,Zermatt,,CH,0,Music,Instrument-Based
+Okeechobee Music & Arts Festival,Okeechobee,FL,US,30000,Music,Electronic / EDM
+Electric Zoo,New York,NY,US,85000,Music,Electronic / EDM
+Movement Electronic Music Festival,Detroit,MI,US,35000,Music,Electronic / Techno
+Coachella Valley Music and Arts Festival,Indio,CA,US,125000,Music,~All (Music)
+Lollapalooza,Chicago,IL,US,400000,Music,~All (Music)
+South by Southwest (SXSW),Austin,TX,US,50000,Conferences,~All (Conferences)
+Shambhala Music Festival,Salmo River Ranch,BC,CA,15000,Music,Electronic / Bass
+Burning Man,Black Rock City,NV,US,75000,Art,Experiential
+Ultra Music Festival,Miami,FL,US,165000,Music,Electronic / EDM
+Tomorrowland,Boom,,BE,400000,Music,Electronic / EDM
+`;
+
+        // 2. EDM CONFESSIONS (For Funny Output) - Using specific examples as seeds for AI
+        const CONFESSIONS_SEEDS = [
+            "I went under the dj booth to do some coke mid set, the bouncer wanted a bump too.",
+            "I wrote my hotel room and hotel on my arm for edc 2012. Came in handy as i still dont know how i got back saturday to my room.",
+            "When I was at front stage center at Calvin Harris at lights all night I didn't want to leave my spot to pee so I just peed my pants right there.",
+            "I have a confession to make. And that is, only Tony Romo can save the rave scene!",
+        ];
+
+        // 3. BUDGETING MODEL (Based on 'Music Festival Master Budgeting Tool (1).xlsx - EXPENSES & TICKET SCENARIOS.csv')
+        // Using ratios and fixed costs to create a scalable base model.
+        const BASE_ATTENDEES = 4798;
+        const BASE_TOTAL_EXPENSE = 1156077;
+        
+        // This is a simplified model for demonstration, maintaining the spirit of fixed vs per-ticket costs.
+        const BUDGET_MODEL = [
+            // Per-Ticket Fees (Approximate average scaled from CSV)
+            { name: 'Site Operations (Security, Venue, Insurance)', type: 'per_ticket', ratio: 0.05, label: 'Cost per Attendee' }, // $50 per ticket roughly
+            { name: 'Talent & Production', type: 'per_ticket', ratio: 0.15, label: 'Cost per Attendee' }, // $150 per ticket roughly
+            { name: 'Marketing & Advertising (Based on Euphoria)', type: 'per_ticket', ratio: 0.07, label: 'Cost per Attendee' }, // $70 per ticket roughly
+            // Fixed Costs (Approximate totals scaled from CSV)
+            { name: 'Fixed Infrastructure/Overhead', type: 'fixed', cost: 350000, label: 'Total Fixed' },
+            { name: 'Staff/Admin Salaries (Fixed)', type: 'fixed', cost: 120000, label: 'Total Fixed' },
+        ];
+
+
+        // --- UTILITY FUNCTIONS ---
+
+        // Simple helper for generating unique IDs (not strictly needed but good practice)
+        const generateUUID = () => crypto.randomUUID();
+
+        // LLM Text Generation Function (Generic)
+        async function generateText(prompt, systemPrompt, targetElementId) {
+            const outputElement = document.getElementById(targetElementId);
+            outputElement.innerHTML = '<div class="text-yellow-400">Generating AI Analysis...</div>';
+
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                // Implement exponential backoff for resilience
+                let response;
+                for (let i = 0; i < 3; i++) { // Max 3 retries
+                    response = await fetch(TEXT_MODEL_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) break;
+
+                    const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "AI response failed to generate text.";
+                
+                // Simple markdown to HTML conversion (basic line breaks for readability)
+                outputElement.innerHTML = text.replace(/\n/g, '<br>');
+                
+            } catch (error) {
+                console.error(`Gemini Text API Error (${targetElementId}):`, error);
+                outputElement.innerHTML = `<p class="text-red-400">Error generating content: ${error.message}. Please check console for details.</p>`;
+            }
+        }
+
+        // LLM Image Generation Function
+        async function generateImage(prompt) {
+            const imageElement = document.getElementById('lineup-image');
+            const placeholderElement = document.getElementById('graphic-placeholder');
+            imageElement.classList.add('hidden');
+            placeholderElement.classList.remove('hidden');
+            placeholderElement.innerHTML = '<div class="text-yellow-400">Generating Lineup Graphic... This may take up to 30 seconds.</div>';
+            
+            try {
+                const imagePrompt = `A stunning, high-contrast, professional-style music festival lineup graphic poster for an event named "${document.getElementById('event-name').value}". The headliners are: ${prompt}. Use a visual style appropriate for the genre: ${document.getElementById('genre').value}.`;
+                
+                const payload = {
+                    instances: [{ prompt: imagePrompt }],
+                    parameters: { "sampleCount": 1 }
+                };
+
+                let response;
+                for (let i = 0; i < 3; i++) { // Max 3 retries
+                    response = await fetch(IMAGE_MODEL_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) break;
+                    
+                    const delay = Math.pow(2, i) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const result = await response.json();
+                
+                const base64Data = result.predictions?.[0]?.bytesBase64Encoded;
+                if (!base64Data) throw new Error("Image generation failed to return data.");
+
+                const imageUrl = `data:image/png;base64,${base64Data}`;
+                
+                placeholderElement.classList.add('hidden');
+                imageElement.src = imageUrl;
+                imageElement.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Gemini Image API Error:", error);
+                placeholderElement.innerHTML = `<p class="text-red-400">Error generating graphic: ${error.message}.</p>`;
+            }
+        }
+
+        // --- CORE CALCULATION LOGIC ---
+
+        function calculateForecast() {
+            const attendance = parseInt(document.getElementById('attendance-goal').value);
+            const avgTicketPrice = parseFloat(document.getElementById('avg-ticket-price').value);
+            const sponsorshipGoal = parseFloat(document.getElementById('sponsorship-goal').value);
+
+            if (isNaN(attendance) || isNaN(avgTicketPrice)) {
+                return { totalRevenue: 0, totalExpense: 0, netProfit: 0, breakdown: [] };
+            }
+
+            // 1. Calculate Revenue
+            const ticketRevenue = attendance * avgTicketPrice;
+            const totalRevenue = ticketRevenue + sponsorshipGoal;
+
+            // 2. Calculate Expenses (Based on Scalable Model)
+            let totalExpense = 0;
+            const expenseBreakdown = [];
+            const baseRevenueEstimate = BASE_ATTENDEES * 240.13; // Base revenue from CSV's breakeven price
+
+            BUDGET_MODEL.forEach(item => {
+                let cost = 0;
+                let calculation = "";
+
+                if (item.type === 'fixed') {
+                    // Fixed costs remain constant
+                    cost = item.cost;
+                    calculation = `$${item.cost.toLocaleString()} (Fixed)`;
+                } else if (item.type === 'per_ticket') {
+                    // Per-ticket costs scale with attendance, but ratio is based on initial average cost
+                    
+                    // Simple scaling model: cost = (Cost Ratio * Target Revenue)
+                    // Note: This is a complex calculation in real life (fixed/variable split). 
+                    // For this simulator, we use the average expense ratio from the source data to scale.
+                    // Instead of using ticket price, let's use the average cost derived from the base model.
+                    
+                    const baseCostPerTicket = item.ratio * baseRevenueEstimate / BASE_ATTENDEES;
+                    cost = attendance * baseCostPerTicket;
+                    calculation = `~${(baseCostPerTicket).toFixed(2)}/ticket * ${attendance}`;
+
+                }
+                
+                totalExpense += cost;
+                expenseBreakdown.push({
+                    name: item.name,
+                    cost: cost,
+                    calculation: calculation
+                });
+            });
+            
+            // Add other variable costs (Merch, F&B, etc.) by assuming a standard industry COGS ratio.
+            // Assuming 15% of ticket revenue is spent on F&B/Merch COGS (which is not included in the per-ticket fees)
+            const variableCOGS = ticketRevenue * 0.15;
+            totalExpense += variableCOGS;
+            expenseBreakdown.push({
+                name: 'Merchandise/F&B COGS (Estimated)',
+                cost: variableCOGS,
+                calculation: `15% of Ticket Revenue (${ticketRevenue.toLocaleString()})`
+            });
+
+            const netProfit = totalRevenue - totalExpense;
+
+            return { totalRevenue, totalExpense, netProfit, attendance, breakdown: expenseBreakdown };
+        }
+
+        // --- MAIN SIMULATOR HANDLER ---
+
+        document.getElementById('forecast-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = document.getElementById('generate-button');
+            const loading = document.getElementById('loading-indicator');
+            
+            // Disable button and show loader
+            button.disabled = true;
+            button.textContent = 'Running Simulation...';
+            loading.classList.remove('hidden');
+
+            const results = calculateForecast();
+            const { totalRevenue, totalExpense, netProfit, attendance } = results;
+            const eventName = document.getElementById('event-name').value;
+            const genre = document.getElementById('genre').value;
+            const city = document.getElementById('city').value;
+            const state = document.getElementById('state').value;
+            const lineup = document.getElementById('artist-lineup').value;
+
+            // 1. Update Financial Summary UI
+            const formatCurrency = (amount) => `$${Math.round(amount).toLocaleString()}`;
+            document.getElementById('out-attendees').textContent = attendance.toLocaleString();
+            document.getElementById('out-revenue').textContent = formatCurrency(totalRevenue);
+            document.getElementById('out-expense').textContent = formatCurrency(totalExpense);
+            document.getElementById('out-profit').textContent = formatCurrency(netProfit);
+            
+            // 2. Prepare LLM Prompts
+            
+            const financialPrompt = `
+                Analyze the following event scenario and provide a detailed breakdown of the forecast. Act as a world-class financial analyst.
+                
+                **Event Scenario:**
+                - Event Name: ${eventName} (${genre} genre)
+                - Target Attendance: ${attendance.toLocaleString()}
+                - Total Estimated Revenue: ${formatCurrency(totalRevenue)}
+                - Total Estimated Expenses: ${formatCurrency(totalExpense)}
+                - Net Profit/Loss: ${formatCurrency(netProfit)}
+                
+                **Expense Breakdown (Key Categories):**
+                ${results.breakdown.map(b => `- ${b.name}: ${formatCurrency(b.cost)} (${b.calculation})`).join('\n')}
+
+                Provide a concise, detailed, and professional narrative that addresses:
+                1. The overall financial health (profit margin and risk assessment).
+                2. The largest cost drivers and the impact of the fixed vs variable expenses.
+                3. A recommendation on pricing strategy or attendance goal adjustment.
+                4. Conclude with a clear summary of the event's viability.
+            `;
+            
+            const competitorPrompt = `
+                Analyze the following list of festivals (CSV data) and identify the top 3 most relevant competitors for a new event with the following profile:
+                - Event Name: ${eventName}
+                - Genre: ${genre}
+                - Location: ${city}, ${state}
+                
+                **Festival Database (CSV):**
+                ${FESTIVAL_WIZARD_DATA}
+
+                Provide the analysis in a short, markdown list, detailing why each competitor is relevant (based on location, genre, or size/attendance).
+            `;
+
+            const confessionsPrompt = `
+                Based on the genre "${genre}" and the following examples of event confessions, generate 5 new, short, and funny anonymous confessions (140 characters or less) that fit the tone and theme of the event. Do not number them.
+                
+                **Confession Seeds:**
+                ${CONFESSIONS_SEEDS.join('\n')}
+            `;
+
+            // 3. Run LLM Tasks (Concurrently)
+            const tasks = [
+                generateText(financialPrompt, "You are a world-class financial analyst specializing in large-scale music festival budgeting and forecasting. Provide a professional and strategic markdown analysis.", 'forecast-narrative'),
+                generateText(competitorPrompt, "You are a strategic market analyst specializing in festival competition. Your goal is to identify and justify the top 3 competitive events from a given list based on location, genre, and size. Output should be in clean markdown format.", 'competitor-analysis'),
+                generateText(confessionsPrompt, "You are a creative writer generating funny, genre-specific, anonymous confessions for event attendees. Output only the 5 confessions, one per line.", 'funny-confessions'),
+            ];
+
+            // Run Image Generation only if a lineup is provided
+            if (lineup && lineup.trim()) {
+                tasks.push(generateImage(lineup.trim()));
+            } else {
+                // Reset image area if no lineup is provided
+                document.getElementById('lineup-image').classList.add('hidden');
+                document.getElementById('graphic-placeholder').classList.remove('hidden');
+                document.getElementById('graphic-placeholder').textContent = "Input an artist lineup above to generate a professional-style festival graphic.";
+            }
+
+            await Promise.all(tasks);
+
+            // Re-enable button and hide loader
+            loading.classList.add('hidden');
+            button.textContent = 'Generate Event Forecast';
+            button.disabled = false;
+        });
+
+        // Initialize with default calculation on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const results = calculateForecast();
+            const formatCurrency = (amount) => `$${Math.round(amount).toLocaleString()}`;
+            document.getElementById('out-attendees').textContent = results.attendance.toLocaleString();
+            document.getElementById('out-revenue').textContent = formatCurrency(results.totalRevenue);
+            document.getElementById('out-expense').textContent = formatCurrency(results.totalExpense);
+            document.getElementById('out-profit').textContent = formatCurrency(results.netProfit);
+        });
+
+    </script>
+</body>
+</html>
