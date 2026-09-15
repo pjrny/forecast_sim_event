@@ -10,6 +10,11 @@
     aggressive: { label: "Aggressive", attnLo: -0.08, attnHi: 0.18 },
   };
 
+  function numLimit(v) {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
@@ -107,8 +112,31 @@
     const wImpact = weatherCtx.weatherImpact; // 0 indoor, 0.5 hybrid, 1 outdoor
     const rainIndex = weatherCtx.rainIndex; // 1–10 or null
 
+    // Limit Registrations + tier max / sales-window ASSUMPTION (MC attendance only)
+    const limitReg = numLimit(baseOptions && baseOptions.limit_registrations);
+    const tierConstr =
+      baseOptions &&
+      baseOptions.tiers &&
+      baseOptions.tiers.enabled &&
+      typeof global.TicketTiers !== "undefined" &&
+      global.TicketTiers &&
+      typeof global.TicketTiers.mcAttendanceConstraints === "function"
+        ? global.TicketTiers.mcAttendanceConstraints(
+            baseOptions.tiers.rows || baseOptions.tiers.tiers || [],
+            base.N
+          )
+        : { maxAttendance: null, walkUpVarianceBoost: 0 };
+
     for (let i = 0; i < draws; i++) {
-      const attnMult = triangular01(rng, preset.attnLo, preset.attnHi);
+      // Short sales window → widen attendance triangle slightly (ASSUMPTION)
+      let attnLo = preset.attnLo;
+      let attnHi = preset.attnHi;
+      const boost = tierConstr.walkUpVarianceBoost || 0;
+      if (boost > 0) {
+        attnLo = attnLo - 0.05 * boost;
+        attnHi = attnHi + 0.08 * boost;
+      }
+      const attnMult = triangular01(rng, attnLo, attnHi);
       const ticketMult = 1 + (rng() - 0.5) * 0.16; // ±8% avg ticket
       const talentMult = lognormalRightSkew(rng, 0.22); // right-skew cost risk
       const prodMult = 0.9 + rng() * 0.25; // 0.9–1.15
@@ -129,7 +157,12 @@
         onsiteMult = onsiteMult * weatherOnsite;
       }
 
-      const N = Math.max(1, Math.round(base.N * attnMult * weatherAttn));
+      let N = Math.max(1, Math.round(base.N * attnMult * weatherAttn));
+      // Cap MC attendance: Limit Registrations, then tier max (ASSUMPTION)
+      if (limitReg > 0) N = Math.min(N, limitReg);
+      if (tierConstr.maxAttendance != null && Number.isFinite(tierConstr.maxAttendance)) {
+        N = Math.min(N, Math.max(1, Math.round(tierConstr.maxAttendance)));
+      }
       const ticket = base.ticket * ticketMult;
 
       const r = engine.compute(model, {
@@ -234,16 +267,18 @@
     const drivers = [
       {
         name: "Attendance",
-        low: () =>
-          engine.compute(model, {
-            ...baseOptions,
-            N: Math.round(base.N * (1 + preset.attnLo)),
-          }).K47,
-        high: () =>
-          engine.compute(model, {
-            ...baseOptions,
-            N: Math.round(base.N * (1 + preset.attnHi)),
-          }).K47,
+        low: () => {
+          let n = Math.round(base.N * (1 + preset.attnLo));
+          const lim = numLimit(baseOptions && baseOptions.limit_registrations);
+          if (lim > 0) n = Math.min(n, lim);
+          return engine.compute(model, { ...baseOptions, N: n }).K47;
+        },
+        high: () => {
+          let n = Math.round(base.N * (1 + preset.attnHi));
+          const lim = numLimit(baseOptions && baseOptions.limit_registrations);
+          if (lim > 0) n = Math.min(n, lim);
+          return engine.compute(model, { ...baseOptions, N: n }).K47;
+        },
       },
       {
         name: "Avg ticket",
