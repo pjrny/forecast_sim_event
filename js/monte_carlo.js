@@ -101,6 +101,7 @@
     const nets = [];
     const coverTickets = []; // K22 > opex?
     const profits = [];
+    const drawsDetail = []; // representative-draw helpers (does not change math)
 
     const weatherCtx = resolveWeatherContext(baseOptions);
     const wImpact = weatherCtx.weatherImpact; // 0 indoor, 0.5 hybrid, 1 outdoor
@@ -155,6 +156,28 @@
       nets.push(net);
       profits.push(net > 0 ? 1 : 0);
       coverTickets.push(ticketsCover ? 1 : 0);
+      drawsDetail.push({
+        i: i,
+        net: net,
+        N: N,
+        baseN: base.N,
+        baseNet: base.K47,
+        K22: r.K22,
+        opexAdj: opexAdj,
+        shocks: {
+          attnMult: attnMult,
+          ticketMult: ticketMult,
+          talentMult: talentMult,
+          prodMult: prodMult,
+          sponsorFrac: sponsorFrac,
+          campMix: campMix,
+          campMixDelta: campMix - base.p_camp,
+          onsiteMult: onsiteMult,
+          weatherAttn: weatherAttn,
+          weatherCost: weatherCost,
+          weatherOnsite: weatherOnsite,
+        },
+      });
     }
 
     nets.sort((a, b) => a - b);
@@ -191,6 +214,7 @@
       sentence,
       baseNet: base.K47,
       weather: weatherCtx,
+      drawsDetail: drawsDetail,
     };
   }
 
@@ -473,5 +497,56 @@
     };
   }
 
-  global.MonteCarlo = { run, PRESETS };
+  /**
+   * Pick draw nearest to P10 / P50 / P90 net from a run() result.
+   * P10 = harder day; P90 = softer. Does not re-roll.
+   */
+  function pickRepresentativeDraw(result, band) {
+    band = band || "P50";
+    if (!result || !Array.isArray(result.drawsDetail) || !result.drawsDetail.length) {
+      return {
+        net: result ? result[band] || result.P50 : 0,
+        baseNet: result ? result.baseNet : 0,
+        N: 0,
+        baseN: 0,
+        shocks: {},
+        band: band,
+      };
+    }
+    const target =
+      band === "P10" ? result.P10 : band === "P90" ? result.P90 : result.P50;
+    let best = result.drawsDetail[0];
+    let bestDist = Math.abs(best.net - target);
+    for (let i = 1; i < result.drawsDetail.length; i++) {
+      const d = result.drawsDetail[i];
+      const dist = Math.abs(d.net - target);
+      if (dist < bestDist) {
+        best = d;
+        bestDist = dist;
+      }
+    }
+    return Object.assign({}, best, { band: band, targetNet: target });
+  }
+
+  function summarizeShocks(draw) {
+    const s = (draw && draw.shocks) || {};
+    return {
+      attendance: s.attnMult,
+      ticket: s.ticketMult,
+      talent: s.talentMult,
+      production: s.prodMult,
+      onsite: s.onsiteMult,
+      campMixDelta: s.campMixDelta,
+      weatherCost: s.weatherCost,
+      weatherAttn: s.weatherAttn,
+    };
+  }
+
+  global.MonteCarlo = {
+    run,
+    PRESETS,
+    pickRepresentativeDraw,
+    summarizeShocks,
+    percentile,
+  };
 })(typeof window !== "undefined" ? window : global);

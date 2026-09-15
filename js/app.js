@@ -1,5 +1,5 @@
 /**
- * Festival Forecaster v1 — Lineup Insurance Pack UI
+ * Festival Forecaster v1.2 — Lineup Insurance Pack + MC journey presentation
  * localStorage drafts only; baked JSON; no login.
  */
 (function () {
@@ -10,6 +10,8 @@
   let festivals = [];
   let lastPnL = null;
   let lastMC = null;
+  let rosGate = null;
+  let mcPres = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -717,7 +719,64 @@
     showPanel("reconcile");
   }
 
+  function renderMcNumbers(result) {
+    $("#mcSentence").textContent = result.sentence;
+    $("#mcP10").textContent = fmtMoney(result.P10);
+    $("#mcP50").textContent = fmtMoney(result.P50);
+    $("#mcP90").textContent = fmtMoney(result.P90);
+    $("#mcPProfit").textContent = Math.round(result.pProfit * 100) + "%";
+    $("#mcPCover").textContent = Math.round(result.pCover * 100) + "%";
+
+    const maxSwing = Math.max(...result.tornado.map((t) => t.swing), 1);
+    $("#tornado").innerHTML = result.tornado
+      .map((t) => {
+        const pct = (t.swing / maxSwing) * 100;
+        return (
+          "<div class='row'><div>" +
+          escapeHtml(t.name) +
+          "</div><div class='bar-wrap'><div class='bar' style='left:0;width:" +
+          pct +
+          "%' title='low " +
+          fmtMoney(t.low) +
+          " · high " +
+          fmtMoney(t.high) +
+          "'></div></div></div>"
+        );
+      })
+      .join("");
+  }
+
+  function startJourneyPresentation(result, band) {
+    if (!mcPres || !rosGate || !rosGate.isConfirmed()) return;
+    const form = readForm();
+    const healthOn = !!( $("#healthProtocolOn") && $("#healthProtocolOn").checked);
+    const headliner =
+      (form.profile && form.profile.talent_names && form.profile.talent_names[0]) ||
+      "the headliner";
+    mcPres.start({
+      mcResult: result,
+      band: band || "P50",
+      campingOn: !!$("#campingOn").checked,
+      healthProtocolOn: healthOn,
+      ros: rosGate.getConfirmedRos(),
+      durationMs: 30000,
+      seed: 42,
+      ctx: {
+        event: form.profile.name || "the fest",
+        city: form.profile.city || "town",
+        headliner: headliner,
+        day: 1,
+      },
+    });
+  }
+
   function runMonteCarlo() {
+    if (!rosGate || !rosGate.isConfirmed()) {
+      flash("Confirm ROS before running Monte Carlo.", "warn");
+      $("#mcStatus").textContent = "ROS not confirmed — Run stays disabled.";
+      if ($("#btnMC")) $("#btnMC").disabled = true;
+      return;
+    }
     const form = readForm();
     const options = form.options;
     options.rfid = form.rfid;
@@ -732,32 +791,12 @@
     setTimeout(() => {
       const result = MonteCarlo.run(model, options, { draws: 5000, preset: preset, seed: 42 });
       lastMC = result;
-      $("#mcStatus").textContent = "";
-      $("#mcSentence").textContent = result.sentence;
-      $("#mcP10").textContent = fmtMoney(result.P10);
-      $("#mcP50").textContent = fmtMoney(result.P50);
-      $("#mcP90").textContent = fmtMoney(result.P90);
-      $("#mcPProfit").textContent = Math.round(result.pProfit * 100) + "%";
-      $("#mcPCover").textContent = Math.round(result.pCover * 100) + "%";
-
-      const maxSwing = Math.max(...result.tornado.map((t) => t.swing), 1);
-      $("#tornado").innerHTML = result.tornado
-        .map((t) => {
-          const pct = (t.swing / maxSwing) * 100;
-          return (
-            "<div class='row'><div>" +
-            escapeHtml(t.name) +
-            "</div><div class='bar-wrap'><div class='bar' style='left:0;width:" +
-            pct +
-            "%' title='low " +
-            fmtMoney(t.low) +
-            " · high " +
-            fmtMoney(t.high) +
-            "'></div></div></div>"
-          );
-        })
-        .join("");
+      $("#mcStatus").textContent = "Numbers ready — animating P50 journey draw…";
+      // STEP D: numbers FIRST (visible without watching animation)
+      renderMcNumbers(result);
       showPanel("montecarlo");
+      // STEP B/C: animate one representative draw (default P50)
+      startJourneyPresentation(result, "P50");
     }, 30);
   }
 
@@ -805,6 +844,15 @@
     });
     $("#marketingPct").addEventListener("change", recalculate);
 
+    if ($("#campingOn")) {
+      $("#campingOn").addEventListener("change", function () {
+        if (rosGate && rosGate.isConfirmed()) {
+          // Camping flag affects camp_open requirement — force re-confirm
+          rosGate.edit();
+          flash("Camping changed — re-confirm ROS before Monte Carlo.", "warn");
+        }
+      });
+    }
     if ($("#rfidEnabled")) {
       $("#rfidEnabled").addEventListener("change", function () {
         if (!$("#rfidEnabled").checked) {
@@ -848,6 +896,45 @@
     $("#btnRecalc").addEventListener("click", recalculate);
     $("#btnReconcile").addEventListener("click", runReconcile);
     $("#btnMC").addEventListener("click", runMonteCarlo);
+    // Phase 2 ROS gate — Run disabled until Confirm
+    if ($("#btnMC")) $("#btnMC").disabled = true;
+    rosGate = RosGate.createController({
+      panelId: "rosGatePanel",
+      tableBodyId: "rosTableBody",
+      errorId: "rosGateErrors",
+      badgeId: "rosConfirmedBadge",
+      getCamping: function () { return !!($("#campingOn") && $("#campingOn").checked); },
+      getProfile: function () {
+        const form = readForm();
+        const p = Object.assign({}, form.profile);
+        p.show_days = $("#showDays") ? Number($("#showDays").value) || undefined : undefined;
+        p.cashlessMode = $("#cashlessMode") ? $("#cashlessMode").value : "hybrid";
+        p.camping = !!($("#campingOn") && $("#campingOn").checked);
+        return p;
+      },
+      setRunEnabled: function (on) {
+        if ($("#btnMC")) {
+          $("#btnMC").disabled = !on;
+          $("#btnMC").title = on ? "Run 5,000 Monte Carlo draws" : "Confirm ROS first";
+        }
+      },
+      onStatus: function (msg, kind) { flash(msg, kind === "pass" ? "info" : kind); },
+    });
+    if ($("#btnRosUseMine")) $("#btnRosUseMine").addEventListener("click", function () { rosGate.startEditEmpty(); });
+    if ($("#btnRosSkeleton")) $("#btnRosSkeleton").addEventListener("click", function () { rosGate.startSkeleton(); });
+    if ($("#btnRosConfirm")) $("#btnRosConfirm").addEventListener("click", function () { rosGate.confirm(); });
+    if ($("#btnRosEdit")) $("#btnRosEdit").addEventListener("click", function () { rosGate.edit(); });
+    if ($("#btnRosCancel")) $("#btnRosCancel").addEventListener("click", function () { rosGate.cancel(); });
+
+    mcPres = McPresentation.create({
+      onComplete: function () {
+        $("#mcStatus").textContent = "Journey complete — numbers above; optional replay below.";
+      },
+      onDownloadPack: function () {
+        if ($("#btnTemplates")) $("#btnTemplates").click();
+      },
+    });
+    mcPres.wireControls();
     $("#btnSave").addEventListener("click", saveDraft);
     $("#btnLoad").addEventListener("click", loadDraft);
     $("#btnPoster").addEventListener("click", () => {

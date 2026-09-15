@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Festival Forecaster v1 — Lineup Insurance Pack</title>
+  <title>Festival Forecaster v1.2 — MC Journey Presentation</title>
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
   <header class="app-header">
     <div class="brand">
-      <h1>Festival Forecaster <span style="color:var(--accent)">v1</span></h1>
+      <h1>Festival Forecaster <span style="color:var(--accent)">v1.2</span></h1>
       <div class="tag">Lineup Insurance Pack · Patron Journey · Master Budget engine (not ratio hacks)</div>
     </div>
     <div class="header-actions">
@@ -234,29 +234,102 @@
         </div>
 
         <div id="panel-montecarlo" class="panel-stack">
-          <h2>Monte Carlo band</h2>
-          <div class="grid-2" style="align-items:end;margin-bottom:0.75rem">
-            <label>Preset
+          <h2>Monte Carlo band <span class="cell-ref">Phase 2 journey</span></h2>
+
+          <!-- STEP A: ROS GATE -->
+          <section class="ros-gate card" id="rosGateIntro" style="background:var(--bg2);margin-bottom:0.75rem">
+            <h3 style="margin-top:0">Run of Show gate</h3>
+            <p style="font-size:0.9rem;color:var(--muted);margin:0 0 0.75rem">
+              Use your ROS, or confirm a generated skeleton? Monte Carlo Run stays disabled until you <strong>Confirm ROS</strong>.
+            </p>
+            <div class="ros-gate-actions" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem">
+              <button type="button" id="btnRosUseMine" class="primary">Use my ROS (edit table)</button>
+              <button type="button" id="btnRosSkeleton">Generate skeleton ROS</button>
+              <span id="rosConfirmedBadge" class="badge" hidden>ROS Confirmed</span>
+            </div>
+            <label class="row" style="margin:0.5rem 0 0">
+              <input type="checkbox" id="healthProtocolOn" />
+              Health-protocol intensity (ESA COVID specifics: 6ft, 100.4F, 14-day isolation) — default OFF
+            </label>
+            <p class="footer-note" style="text-align:left;padding:0.25rem 0;margin:0">
+              Weather, crush, ingress, toilets, medical staffing, and production hygiene stay available for OPS either way.
+            </p>
+          </section>
+
+          <div id="rosGatePanel" class="ros-gate-panel" hidden>
+            <p id="rosGateErrors" class="banner warn" hidden></p>
+            <div class="rfid-table-wrap">
+              <table class="pnl ros-table" id="rosTable">
+                <thead>
+                  <tr><th>Time</th><th>Area</th><th>Action</th><th>Owner</th><th>Day</th></tr>
+                </thead>
+                <tbody id="rosTableBody"></tbody>
+              </table>
+            </div>
+            <p class="footer-note" style="text-align:left;padding:0.35rem 0">
+              Required actions: gates, first_set, doors, peak, last_set, egress
+              (plus <code>camp_open</code> when Camping on).
+            </p>
+            <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+              <button type="button" id="btnRosConfirm" class="primary">Confirm ROS</button>
+              <button type="button" id="btnRosEdit">Edit</button>
+              <button type="button" id="btnRosCancel" class="ghost">Cancel</button>
+            </div>
+          </div>
+
+          <div class="grid-2" style="align-items:end;margin:0.75rem 0">
+            <label>Preset <span class="cell-ref">shock width only</span>
               <select id="mcPreset">
                 <option value="conservative">Conservative (−25% / +5% attn)</option>
                 <option value="base" selected>Base (−15% / +10%)</option>
                 <option value="aggressive">Aggressive (−8% / +18%)</option>
               </select>
             </label>
-            <button type="button" id="btnMC" class="primary">Run 5,000 draws</button>
+            <button type="button" id="btnMC" class="primary" disabled title="Confirm ROS first">Run 5,000 draws</button>
           </div>
           <p id="mcStatus" class="footer-note" style="text-align:left"></p>
-          <p id="mcSentence" style="font-size:0.95rem;line-height:1.45;margin:0.5rem 0 1rem"></p>
-          <div class="kpi-row" style="margin-bottom:1rem">
-            <div class="kpi"><div class="label">P10 net</div><div class="value" id="mcP10">—</div></div>
-            <div class="kpi"><div class="label">P50 net</div><div class="value" id="mcP50">—</div></div>
-            <div class="kpi"><div class="label">P90 net</div><div class="value" id="mcP90">—</div></div>
-            <div class="kpi"><div class="label">P(profit&gt;0) / P(tickets≥opex)</div>
-              <div class="value" style="font-size:1.1rem"><span id="mcPProfit">—</span> · <span id="mcPCover">—</span></div>
+
+          <!-- Numbers FIRST (visible without watching animation) -->
+          <div id="mcNumbersBlock">
+            <p id="mcSentence" style="font-size:0.95rem;line-height:1.45;margin:0.5rem 0 1rem"></p>
+            <div class="kpi-row" style="margin-bottom:1rem">
+              <div class="kpi"><div class="label">P10 net</div><div class="value" id="mcP10">—</div></div>
+              <div class="kpi"><div class="label">P50 net</div><div class="value" id="mcP50">—</div></div>
+              <div class="kpi"><div class="label">P90 net</div><div class="value" id="mcP90">—</div></div>
+              <div class="kpi"><div class="label">P(profit&gt;0) / P(tickets≥opex)</div>
+                <div class="value" style="font-size:1.1rem"><span id="mcPProfit">—</span> · <span id="mcPCover">—</span></div>
+              </div>
             </div>
+            <h3>Tornado (swing)</h3>
+            <div class="tornado" id="tornado"></div>
           </div>
-          <h3>Tornado (swing)</h3>
-          <div class="tornado" id="tornado"></div>
+
+          <!-- STEP B: Journey presentation -->
+          <div id="mcJourneyShell" class="mc-journey-shell" hidden>
+            <div class="journey-toolbar">
+              <div id="mcJourneyClock" class="journey-clock">0.0s</div>
+              <div id="mcJourneyStageStatus" class="journey-stage-status">—</div>
+              <button type="button" id="mcJourneyPause" class="ghost">Pause</button>
+              <label class="journey-scrub-label">Scrub
+                <input type="range" id="mcJourneyScrub" min="0" max="30000" value="0" />
+              </label>
+            </div>
+            <div class="journey-progress-track"><div id="mcJourneyProgress" class="journey-progress-bar"></div></div>
+            <div class="journey-layout">
+              <aside id="mcJourneyRail" class="journey-rail" aria-label="Patron journey stages"></aside>
+              <div class="journey-feeds">
+                <section class="feed-col">
+                  <h3>OPS</h3>
+                  <div id="mcOpsFeed" class="feed-scroll"></div>
+                </section>
+                <section class="feed-col">
+                  <h3>CROWD</h3>
+                  <div id="mcCrowdFeed" class="feed-scroll"></div>
+                </section>
+              </div>
+            </div>
+            <div id="mcJourneyDebrief" class="journey-debrief" hidden></div>
+          </div>
         </div>
 
         <div id="panel-competitors" class="panel-stack">
@@ -287,6 +360,10 @@
   <script src="js/templates.js"></script>
   <script src="js/rfid_addon.js"></script>
   <script src="js/safety_weather.js"></script>
+  <script src="js/crowd_bank.js"></script>
+  <script src="js/ops_bank.js"></script>
+  <script src="js/ros_gate.js"></script>
+  <script src="js/mc_presentation.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
