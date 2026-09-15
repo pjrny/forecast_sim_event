@@ -264,7 +264,7 @@
 
     const production_incl_talent = production + talent;
     const misc_guest = pre_production + misc;
-    // Master Budget G3 only (sheet target) — never includes RFID add-on
+    // Master Budget G3 only (sheet target) — never includes RFID or Safety/Weather add-ons
     const G3_master =
       site +
       production_incl_talent +
@@ -308,8 +308,55 @@
       };
     }
     const rfid_subtotal = rfidEnabled ? num(rfidEstimate.subtotal, 0) : 0;
-    // Live total opex = Master Budget G3 + optional RFID add-on
-    const total_opex = G3_master + rfid_subtotal;
+
+    // Optional Safety / Weather — additive to LIVE forecast only (outside Master G3)
+    const swOpts = options.safetyWeather || options.safety_weather || {};
+    const swEnabled = !!swOpts.enabled;
+    let swEstimate = {
+      enabled: false,
+      lines: [],
+      subtotal: 0,
+      bucket_label: "Safety / Weather (optional)",
+    };
+    if (
+      swEnabled &&
+      typeof global.SafetyWeather !== "undefined" &&
+      global.SafetyWeather &&
+      typeof global.SafetyWeather.computeSafetyWeatherEstimate === "function"
+    ) {
+      swEstimate = global.SafetyWeather.computeSafetyWeatherEstimate({
+        enabled: true,
+        N: N,
+        peak_occupancy: swOpts.peak_occupancy != null ? swOpts.peak_occupancy : N,
+        show_days: swOpts.show_days,
+        load_in_days: swOpts.load_in_days,
+        camping:
+          swOpts.camping != null
+            ? swOpts.camping
+            : wiz.camping === "on" || wiz.camping === true,
+        venue_mode: swOpts.venue_mode,
+        weather_service_budget: swOpts.weather_service_budget,
+        cancellation_reserve_pct: swOpts.cancellation_reserve_pct,
+        master_opex: G3_master,
+        qtyOverrides: swOpts.qtyOverrides || {},
+        ahj_fire_permit_status: swOpts.ahj_fire_permit_status,
+        lightning_stand_down_miles: swOpts.lightning_stand_down_miles,
+        wind_hold_mph: swOpts.wind_hold_mph,
+        heat_index_cold_trigger: swOpts.heat_index_cold_trigger,
+        nearest_hospital_minutes: swOpts.nearest_hospital_minutes,
+      });
+    } else if (swEnabled) {
+      swEstimate = {
+        enabled: true,
+        lines: [],
+        subtotal: 0,
+        bucket_label: "Safety / Weather (optional)",
+        warning: "SafetyWeather not loaded",
+      };
+    }
+    const safety_weather_subtotal = swEnabled ? num(swEstimate.subtotal, 0) : 0;
+    // Live total opex = Master Budget G3 + optional RFID + optional Safety/Weather
+    const total_opex = G3_master + rfid_subtotal + safety_weather_subtotal;
 
     // Ancillaries: default scale amount*(N/N0); user-overridable
     const ancOverrides = options.ancillaryOverrides || {};
@@ -375,6 +422,9 @@
       rfid: rfidEstimate,
       rfid_subtotal: rfid_subtotal,
       rfid_enabled: rfidEnabled,
+      safety_weather: swEstimate,
+      safety_weather_subtotal: safety_weather_subtotal,
+      safety_weather_enabled: swEnabled,
       ancillaries: ancLines,
       ancTotal,
       kickback,
@@ -429,6 +479,7 @@
       scaleAncillaries: false,
       wizard: {},
       rfid: { enabled: false },
+      safetyWeather: { enabled: false },
     });
     const targets = model.sheet_targets_at_N0;
     const rows = [
