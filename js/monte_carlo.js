@@ -102,8 +102,9 @@
     const coverTickets = []; // K22 > opex?
     const profits = [];
 
-    // Tornado: one-at-a-time high/low on key drivers
-    const tornadoDrivers = [];
+    const weatherCtx = resolveWeatherContext(baseOptions);
+    const wImpact = weatherCtx.weatherImpact; // 0 indoor, 0.5 hybrid, 1 outdoor
+    const rainIndex = weatherCtx.rainIndex; // 1–10 or null
 
     for (let i = 0; i < draws; i++) {
       const attnMult = triangular01(rng, preset.attnLo, preset.attnHi);
@@ -111,10 +112,23 @@
       const talentMult = lognormalRightSkew(rng, 0.22); // right-skew cost risk
       const prodMult = 0.9 + rng() * 0.25; // 0.9–1.15
       const sponsorFrac = betaSample(rng, 2, 5); // sponsor realization 0–1-ish, mean ~0.29
-      const campMix = Math.min(0.99, Math.max(0.05, base.p_camp + (rng() - 0.5) * 0.2));
-      const onsiteMult = 0.7 + rng() * 0.6; // 0.7–1.3 on-site / ancillaries
+      let campMix = Math.min(0.99, Math.max(0.05, base.p_camp + (rng() - 0.5) * 0.2));
+      let onsiteMult = 0.7 + rng() * 0.6; // 0.7–1.3 on-site / ancillaries
 
-      const N = Math.max(1, Math.round(base.N * attnMult));
+      // Weather (climatology) driver — outdoor/hybrid only when rain_index available
+      let weatherAttn = 1;
+      let weatherCost = 1;
+      let weatherOnsite = 1;
+      if (wImpact > 0 && rainIndex != null) {
+        const wx = weatherShocks(rng, rainIndex, campMix, wImpact);
+        weatherAttn = wx.attnMult;
+        weatherCost = wx.costMult;
+        weatherOnsite = wx.onsiteMult;
+        campMix = wx.campMix;
+        onsiteMult = onsiteMult * weatherOnsite;
+      }
+
+      const N = Math.max(1, Math.round(base.N * attnMult * weatherAttn));
       const ticket = base.ticket * ticketMult;
 
       const r = engine.compute(model, {
@@ -128,11 +142,14 @@
       });
 
       // Apply talent/production shocks on top of computed departments by adjusting net
-      // Recompute with modified talent/production via wizard-like overrides:
+      // Weather pulls production/site/safety costs up via weatherCost
       const talentShock = r.departments.talent * (talentMult - 1);
-      const prodShock = r.departments.production * (prodMult - 1);
-      const net = r.K47 - talentShock - prodShock;
-      const opexAdj = r.total_opex + talentShock + prodShock;
+      const prodShock = r.departments.production * (prodMult * weatherCost - 1);
+      const siteShock = r.departments.site * (weatherCost - 1);
+      const safetyShock =
+        (r.safety_weather_subtotal || 0) * (weatherCost - 1);
+      const net = r.K47 - talentShock - prodShock - siteShock - safetyShock;
+      const opexAdj = r.total_opex + talentShock + prodShock + siteShock + safetyShock;
       const ticketsCover = r.K22 > opexAdj;
 
       nets.push(net);
@@ -148,7 +165,7 @@
     const pCover = coverTickets.reduce((a, b) => a + b, 0) / draws;
 
     // Tornado sensitivity (deterministic ± shocks on base)
-    const tornado = buildTornado(engine, model, baseOptions, base, preset);
+    const tornado = buildTornado(engine, model, baseOptions, base, preset, weatherCtx);
 
     const sentence = plainSentence({
       P10,
@@ -158,6 +175,7 @@
       pCover,
       preset: preset.label,
       baseNet: base.K47,
+      weatherCtx: weatherCtx,
     });
 
     return {
@@ -172,6 +190,7 @@
       tornado,
       sentence,
       baseNet: base.K47,
+      weather: weatherCtx,
     };
   }
 
@@ -187,7 +206,7 @@
     return out;
   }
 
-  function buildTornado(engine, model, baseOptions, base, preset) {
+  function buildTornado(engine, model, baseOptions, base, preset, weatherCtx) {
     const drivers = [
       {
         name: "Attendance",
@@ -258,6 +277,17 @@
       },
     ];
 
+    // Weather (climatology) tornado bar when outdoor/hybrid + rain_index
+    if (weatherCtx && weatherCtx.weatherImpact > 0 && weatherCtx.rainIndex != null) {
+      drivers.push({
+        name: "Weather (climatology)",
+        low: () =>
+          applyWeatherTornado(engine, model, baseOptions, base, weatherCtx, "dry").K47,
+        high: () =>
+          applyWeatherTornado(engine, model, baseOptions, base, weatherCtx, "wet").K47,
+      });
+    }
+
     return drivers
       .map((d) => {
         const lo = d.low();
@@ -278,7 +308,7 @@
       "$" +
       Math.abs(Math.round(n)).toLocaleString("en-US");
     const pct = (p) => Math.round(p * 100) + "%";
-    return (
+    let out =
       "Under the " +
       s.preset +
       " attendance band, median full profit (K47) is " +
@@ -291,8 +321,156 @@
       pct(s.pProfit) +
       " of draws profitable and " +
       pct(s.pCover) +
-      " where ticket revenue covers opex."
+      " where ticket revenue covers opex.";
+    const wx = s.weatherCtx;
+    if (wx && wx.weatherImpact > 0 && wx.state && wx.month) {
+      const monthNames = [
+        "",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      const monthLabel = monthNames[wx.month] || String(wx.month);
+      out +=
+        " Weather driver uses climatology for " +
+        wx.state +
+        " in " +
+        monthLabel +
+        ", not a live forecast.";
+    }
+    return out;
+  }
+
+  function resolveWeatherContext(baseOptions) {
+    baseOptions = baseOptions || {};
+    const sw = baseOptions.safetyWeather || baseOptions.safety_weather || {};
+    const profile = baseOptions.profile || {};
+    const venue =
+      sw.venue_mode ||
+      profile.venue_mode ||
+      (baseOptions.wizard && baseOptions.wizard.venue_mode) ||
+      "outdoor";
+    let weatherImpact = 0;
+    const mode = String(venue).toLowerCase();
+    if (mode === "outdoor") weatherImpact = 1;
+    else if (mode === "hybrid") weatherImpact = 0.5; // ASSUMPTION
+    else weatherImpact = 0;
+
+    const state = (sw.state || profile.state || baseOptions.state || "").toUpperCase();
+    const city = sw.city || profile.city || baseOptions.city || "";
+    let month = sw.month || profile.month || baseOptions.month || null;
+    if (!month) {
+      const dateStr =
+        sw.start_date ||
+        profile.start_date ||
+        baseOptions.start_date ||
+        null;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) month = d.getUTCMonth() + 1;
+      }
+    }
+    month = month != null ? Number(month) : null;
+
+    let rainIndex = null;
+    let rainLookup = null;
+    if (
+      weatherImpact > 0 &&
+      typeof global.SafetyWeather !== "undefined" &&
+      global.SafetyWeather &&
+      typeof global.SafetyWeather.lookupRainIndex === "function"
+    ) {
+      rainLookup = global.SafetyWeather.lookupRainIndex({
+        state: state,
+        city: city,
+        month: month,
+      });
+      if (rainLookup && rainLookup.index != null) rainIndex = rainLookup.index;
+    }
+
+    return {
+      venue_mode: mode,
+      weatherImpact: weatherImpact,
+      state: state || null,
+      city: city || null,
+      month: month,
+      rainIndex: rainIndex,
+      rainLookup: rainLookup,
+    };
+  }
+
+  /**
+   * Weather shocks from climatology rain_index (1–10).
+   * Higher rain → attendance down (camping harder), costs up, on-site F&B/merch down.
+   */
+  function weatherShocks(rng, rainIndex, campMix, wImpact) {
+    const r = Math.max(1, Math.min(10, Number(rainIndex) || 5));
+    // Center at 5: wet pulls attn down more for campers
+    const wetness = ((r - 5) / 5) * wImpact; // -1..+1 scaled by venue impact
+    // Stochastic around climatology bias
+    const noise = (rng() - 0.5) * 0.08 * wImpact;
+    const campPenalty = 0.12 * Math.max(0, wetness) * (0.5 + campMix); // camping harder
+    const dayPenalty = 0.06 * Math.max(0, wetness);
+    const attnMult = Math.max(0.55, 1 - campPenalty - dayPenalty + noise);
+    const costMult = Math.max(0.9, 1 + 0.14 * Math.max(0, wetness) + Math.abs(noise));
+    const onsiteMult = Math.max(0.5, 1 - 0.18 * Math.max(0, wetness) + noise * 0.5);
+    // Camp mix softens when wet (camping harder)
+    const campMixAdj = Math.min(
+      0.99,
+      Math.max(0.05, campMix * (1 - 0.15 * Math.max(0, wetness)))
     );
+    return {
+      attnMult: attnMult,
+      costMult: costMult,
+      onsiteMult: onsiteMult,
+      campMix: campMixAdj,
+    };
+  }
+
+  function applyWeatherTornado(engine, model, baseOptions, base, weatherCtx, side) {
+    const rain = weatherCtx.rainIndex;
+    const wImpact = weatherCtx.weatherImpact;
+    // dry: treat as rain_index 2; wet: rain_index 9
+    const fakeRain = side === "dry" ? 2 : 9;
+    const campMix = base.p_camp;
+    // Deterministic mid-rng substitute via fixed shocks (no rng)
+    const wetness = ((fakeRain - 5) / 5) * wImpact;
+    const campPenalty = 0.12 * Math.max(0, wetness) * (0.5 + campMix);
+    const dayPenalty = 0.06 * Math.max(0, wetness);
+    const attnMult = Math.max(0.55, 1 - campPenalty - dayPenalty);
+    const costMult = Math.max(0.9, 1 + 0.14 * Math.max(0, wetness));
+    const onsiteMult = Math.max(0.5, 1 - 0.18 * Math.max(0, wetness));
+    const campAdj = Math.min(
+      0.99,
+      Math.max(0.05, campMix * (1 - 0.15 * Math.max(0, wetness)))
+    );
+    const N = Math.max(1, Math.round(base.N * attnMult));
+    const o = {};
+    (base.ancillaries || []).forEach(function (a) {
+      o[a.id] = a.amount * onsiteMult;
+    });
+    const r = engine.compute(model, {
+      ...baseOptions,
+      N: N,
+      p_camp: campAdj,
+      ancillaryOverrides: o,
+      scaleAncillaries: false,
+    });
+    const prodShock = r.departments.production * (costMult - 1);
+    const siteShock = r.departments.site * (costMult - 1);
+    const safetyShock = (r.safety_weather_subtotal || 0) * (costMult - 1);
+    return {
+      K47: r.K47 - prodShock - siteShock - safetyShock,
+    };
   }
 
   global.MonteCarlo = { run, PRESETS };

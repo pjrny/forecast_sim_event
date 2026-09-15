@@ -71,6 +71,9 @@
         cashlessMode: $("#cashlessMode") ? $("#cashlessMode").value : "hybrid",
         qtyOverrides: readRfidQtyOverrides(),
       },
+      // ===== BEGIN Safety / Weather form =====
+      safetyWeather: readSafetyWeatherForm(),
+      // ===== END Safety / Weather form =====
     };
   }
 
@@ -83,6 +86,50 @@
     if (!window.__rfidQtyOverrides) window.__rfidQtyOverrides = {};
     const v = Number(value);
     if (Number.isFinite(v) && v >= 0) window.__rfidQtyOverrides[id] = v;
+  }
+
+  function readSafetyWeatherQtyOverrides() {
+    return Object.assign({}, window.__swQtyOverrides || {});
+  }
+
+  function setSafetyWeatherQtyOverride(id, value) {
+    if (!window.__swQtyOverrides) window.__swQtyOverrides = {};
+    const v = Number(value);
+    if (Number.isFinite(v) && v >= 0) window.__swQtyOverrides[id] = v;
+  }
+
+  function readSafetyWeatherForm() {
+    const peakRaw = $("#peakOccupancy") && $("#peakOccupancy").value;
+    const N = Number($("#attendance") && $("#attendance").value) || 0;
+    return {
+      enabled: !!($("#safetyWeatherEnabled") && $("#safetyWeatherEnabled").checked),
+      venue_mode: $("#venueMode") ? $("#venueMode").value : "outdoor",
+      peak_occupancy: peakRaw !== "" && peakRaw != null ? Number(peakRaw) : N,
+      show_days: $("#showDays") ? Number($("#showDays").value) : 3,
+      load_in_days: $("#loadInDays") ? Number($("#loadInDays").value) : 2,
+      camping: $("#campingOn") && $("#campingOn").checked,
+      nearest_hospital_minutes: $("#nearestHospitalMin")
+        ? Number($("#nearestHospitalMin").value)
+        : 25,
+      ahj_fire_permit_status: $("#ahjFirePermit")
+        ? $("#ahjFirePermit").value
+        : "unknown",
+      lightning_stand_down_miles: $("#lightningMiles")
+        ? Number($("#lightningMiles").value)
+        : 8,
+      wind_hold_mph: $("#windHoldMph") ? Number($("#windHoldMph").value) : 35,
+      heat_index_cold_trigger: $("#heatColdNotes") ? $("#heatColdNotes").value : "",
+      weather_service_budget: $("#weatherServiceBudget")
+        ? Number($("#weatherServiceBudget").value)
+        : 2500,
+      cancellation_reserve_pct: $("#cancellationReservePct")
+        ? Number($("#cancellationReservePct").value)
+        : 5,
+      qtyOverrides: readSafetyWeatherQtyOverrides(),
+      state: $("#state") ? $("#state").value.trim() : "",
+      city: $("#city") ? $("#city").value.trim() : "",
+      start_date: $("#startDate") ? $("#startDate").value : "",
+    };
   }
 
   function applyDefaultsToForm() {
@@ -107,6 +154,22 @@
     if ($("#rfidEnabled")) $("#rfidEnabled").checked = false;
     if ($("#cashlessMode")) $("#cashlessMode").value = "hybrid";
     if ($("#rfidQtyPanel")) $("#rfidQtyPanel").hidden = true;
+    // ===== BEGIN Safety / Weather defaults =====
+    if ($("#safetyWeatherEnabled")) $("#safetyWeatherEnabled").checked = false;
+    if ($("#safetyWeatherPanel")) $("#safetyWeatherPanel").hidden = true;
+    if ($("#venueMode")) $("#venueMode").value = "outdoor";
+    if ($("#peakOccupancy")) $("#peakOccupancy").value = "";
+    if ($("#showDays")) $("#showDays").value = 3;
+    if ($("#loadInDays")) $("#loadInDays").value = 2;
+    if ($("#nearestHospitalMin")) $("#nearestHospitalMin").value = 25;
+    if ($("#ahjFirePermit")) $("#ahjFirePermit").value = "unknown";
+    if ($("#lightningMiles")) $("#lightningMiles").value = 8;
+    if ($("#windHoldMph")) $("#windHoldMph").value = 35;
+    if ($("#weatherServiceBudget")) $("#weatherServiceBudget").value = 2500;
+    if ($("#cancellationReservePct")) $("#cancellationReservePct").value = 5;
+    if ($("#heatColdNotes")) $("#heatColdNotes").value = "";
+    window.__swQtyOverrides = {};
+    // ===== END Safety / Weather defaults =====
   }
 
   function saveDraft() {
@@ -159,6 +222,33 @@
           $("#cashlessMode").value = data.rfid.cashlessMode;
         window.__rfidQtyOverrides = data.rfid.qtyOverrides || {};
       }
+      // ===== BEGIN Safety / Weather draft =====
+      if (data.safetyWeather) {
+        const sw = data.safetyWeather;
+        if ($("#safetyWeatherEnabled")) $("#safetyWeatherEnabled").checked = !!sw.enabled;
+        if ($("#venueMode") && sw.venue_mode) $("#venueMode").value = sw.venue_mode;
+        if ($("#peakOccupancy") && sw.peak_occupancy != null)
+          $("#peakOccupancy").value = sw.peak_occupancy;
+        if ($("#showDays") && sw.show_days != null) $("#showDays").value = sw.show_days;
+        if ($("#loadInDays") && sw.load_in_days != null)
+          $("#loadInDays").value = sw.load_in_days;
+        if ($("#nearestHospitalMin") && sw.nearest_hospital_minutes != null)
+          $("#nearestHospitalMin").value = sw.nearest_hospital_minutes;
+        if ($("#ahjFirePermit") && sw.ahj_fire_permit_status)
+          $("#ahjFirePermit").value = sw.ahj_fire_permit_status;
+        if ($("#lightningMiles") && sw.lightning_stand_down_miles != null)
+          $("#lightningMiles").value = sw.lightning_stand_down_miles;
+        if ($("#windHoldMph") && sw.wind_hold_mph != null)
+          $("#windHoldMph").value = sw.wind_hold_mph;
+        if ($("#weatherServiceBudget") && sw.weather_service_budget != null)
+          $("#weatherServiceBudget").value = sw.weather_service_budget;
+        if ($("#cancellationReservePct") && sw.cancellation_reserve_pct != null)
+          $("#cancellationReservePct").value = sw.cancellation_reserve_pct;
+        if ($("#heatColdNotes") && sw.heat_index_cold_trigger != null)
+          $("#heatColdNotes").value = sw.heat_index_cold_trigger;
+        window.__swQtyOverrides = sw.qtyOverrides || {};
+      }
+      // ===== END Safety / Weather draft =====
       flash("Draft loaded.", "info");
       recalculate();
     } catch (e) {
@@ -226,17 +316,38 @@
       "<tr class='total'><td>Master Budget total opex</td><td class='cell'>G3</td><td class='num'>" +
       fmtMoney2(r.G3) +
       "</td></tr>";
-    if (r.rfid_enabled && r.rfid) {
+    const hasRfid = r.rfid_enabled && r.rfid;
+    const hasSw = r.safety_weather_enabled && r.safety_weather;
+    if (hasRfid) {
       html +=
         "<tr class='addon-row'><td>RFID / Cashless (Basic Scenario) <span class='cell-ref' title='Optional add-on — not Master Budget'>add-on</span></td><td class='cell'>RFID</td><td class='num'>" +
         fmtMoney2(r.rfid_subtotal) +
         "</td></tr>";
+    }
+    // ===== BEGIN Safety / Weather P&L rows =====
+    if (hasSw) {
       html +=
-        "<tr class='total addon-row'><td>Total opex (live = G3 + RFID)</td><td class='cell'>live</td><td class='num'>" +
+        "<tr class='addon-row'><td>Safety / Weather <span class='cell-ref' title='Optional add-on — not Master Budget; not a legal/safety plan'>add-on</span></td><td class='cell'>S/W</td><td class='num'>" +
+        fmtMoney2(r.safety_weather_subtotal) +
+        "</td></tr>";
+    }
+    // ===== END Safety / Weather P&L rows =====
+    if (hasRfid || hasSw) {
+      const parts = ["G3"];
+      if (hasRfid) parts.push("RFID");
+      if (hasSw) parts.push("Safety/Weather");
+      html +=
+        "<tr class='total addon-row'><td>Total opex (live = " +
+        parts.join(" + ") +
+        ")</td><td class='cell'>live</td><td class='num'>" +
         fmtMoney2(r.total_opex) +
         "</td></tr>";
       html +=
-        "<tr class='sub'><td colspan='3' style='font-size:0.78rem'>RFID is additive to Master Budget for the live forecast only. Unit prices from Basic Scenario Calculator PRICES — not Master Budget.</td></tr>";
+        "<tr class='sub'><td colspan='3' style='font-size:0.78rem'>Optional add-ons are additive to Master Budget for the live forecast only — not baked into G3." +
+        (hasSw
+          ? " Safety/Weather is a planning estimate only (not a legal/safety plan; not NOAA)."
+          : "") +
+        "</td></tr>";
     }
     html +=
       "<tr><td>Ticket + camp revenue</td><td class='cell'>K22</td><td class='num'>" +
@@ -327,8 +438,23 @@
     ) {
       options.rfid.qtyOverrides = window.__rfidQtyOverrides;
     }
+    // ===== BEGIN Safety / Weather compute wiring =====
+    options.safetyWeather = form.safetyWeather;
+    options.profile = profile;
+    options.state = profile.state;
+    options.city = profile.city;
+    options.start_date = profile.start_date;
+    if (
+      form.safetyWeather.enabled &&
+      Object.keys(form.safetyWeather.qtyOverrides || {}).length === 0 &&
+      window.__swQtyOverrides
+    ) {
+      options.safetyWeather.qtyOverrides = window.__swQtyOverrides;
+    }
+    // ===== END Safety / Weather compute wiring =====
     const r = BudgetEngine.compute(model, options);
     renderRfidPanel(r);
+    renderSafetyWeatherPanel(r);
     renderPnL(r);
     renderCompetitors(profile, r);
   }
@@ -414,6 +540,97 @@
       }
     }
   }
+
+  // ===== BEGIN Safety / Weather panel =====
+  function renderSafetyWeatherPanel(r) {
+    const enabled = $("#safetyWeatherEnabled") && $("#safetyWeatherEnabled").checked;
+    const panel = $("#safetyWeatherPanel");
+    if (!panel) return;
+    panel.hidden = !enabled;
+    if (!enabled) {
+      if ($("#safetyWeatherSubtotal")) $("#safetyWeatherSubtotal").textContent = fmtMoney2(0);
+      return;
+    }
+    let est = r && r.safety_weather;
+    if (!est || !est.enabled) {
+      const form = readSafetyWeatherForm();
+      const N = Number($("#attendance").value) || (model && model.baseline.N0) || 0;
+      // Need master G3 for cancellation reserve — compute base without SW if needed
+      const baseOnly = BudgetEngine.compute(model, {
+        N: N,
+        ticket: Number($("#ticketPrice").value),
+        camp_fee: Number($("#campFee").value),
+        p_camp: Number($("#pCamp").value) / 100,
+        scaleAncillaries: $("#scaleAncillaries").checked,
+        wizard: {
+          musicFocus: $("#musicFocus").checked ? "yes" : "no",
+          experienceFocus: $("#experienceFocus").checked ? "yes" : false,
+          camping: $("#campingOn").checked ? "on" : false,
+          lastMinuteProduction: $("#lastMinute").checked,
+          marketingPct: Number($("#marketingPct").value),
+          marketingHardCap: $("#marketingCap").value
+            ? Number($("#marketingCap").value)
+            : null,
+        },
+        rfid: { enabled: false },
+        safetyWeather: { enabled: false },
+      });
+      est = SafetyWeather.computeSafetyWeatherEstimate(
+        Object.assign({}, form, {
+          enabled: true,
+          N: N,
+          master_opex: baseOnly.G3,
+          qtyOverrides: Object.assign({}, window.__swQtyOverrides || {}, form.qtyOverrides),
+        })
+      );
+    }
+    const body = $("#safetyWeatherQtyBody");
+    const prevFocus =
+      document.activeElement && document.activeElement.classList.contains("sw-qty-input")
+        ? document.activeElement.dataset.id
+        : null;
+    let html = "";
+    (est.lines || []).forEach(function (line) {
+      html +=
+        "<tr class='rfid-row'><td>" +
+        escapeHtml(line.label) +
+        "<div class='muted-label'>" +
+        escapeHtml(line.unit || "") +
+        (line.category ? " · " + escapeHtml(line.category) : "") +
+        "</div></td><td class='num'>" +
+        fmtMoney2(line.unit_price) +
+        "</td><td class='num'><input type='number' min='0' step='1' class='sw-qty-input' data-id='" +
+        escapeHtml(line.id) +
+        "' value='" +
+        line.qty +
+        "' /></td><td class='num'>" +
+        fmtMoney2(line.extended) +
+        "</td></tr>";
+    });
+    body.innerHTML = html;
+    $("#safetyWeatherSubtotal").textContent = fmtMoney2(est.subtotal);
+    if ($("#safetyWeatherAssumption")) {
+      $("#safetyWeatherAssumption").textContent =
+        est.assumption_note ||
+        "ASSUMPTION: default qtys from heuristics. Edit any qty.";
+    }
+    if ($("#safetyWeatherDisclaimer")) {
+      $("#safetyWeatherDisclaimer").textContent =
+        est.disclaimer ||
+        "Planning estimate only — not a legal/safety plan.";
+    }
+    $$(".sw-qty-input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        setSafetyWeatherQtyOverride(inp.dataset.id, inp.value);
+        recalculate();
+      });
+    });
+    if (prevFocus) {
+      const el = document.querySelector('.sw-qty-input[data-id="' + prevFocus + '"]');
+      if (el) el.focus();
+    }
+  }
+  // ===== END Safety / Weather panel =====
 
   function renderCompetitors(profile, r) {
     const self = {
@@ -501,7 +718,14 @@
   }
 
   function runMonteCarlo() {
-    const { options } = readForm();
+    const form = readForm();
+    const options = form.options;
+    options.rfid = form.rfid;
+    options.safetyWeather = form.safetyWeather;
+    options.profile = form.profile;
+    options.state = form.profile.state;
+    options.city = form.profile.city;
+    options.start_date = form.profile.start_date;
     const preset = $("#mcPreset").value;
     $("#mcStatus").textContent = "Running 5,000 draws…";
     // Yield to UI
@@ -593,6 +817,34 @@
       $("#cashlessMode").addEventListener("change", recalculate);
     }
 
+    // ===== BEGIN Safety / Weather listeners =====
+    if ($("#safetyWeatherEnabled")) {
+      $("#safetyWeatherEnabled").addEventListener("change", function () {
+        if (!$("#safetyWeatherEnabled").checked) {
+          window.__swQtyOverrides = {};
+        }
+        recalculate();
+      });
+    }
+    [
+      "venueMode",
+      "peakOccupancy",
+      "showDays",
+      "loadInDays",
+      "nearestHospitalMin",
+      "ahjFirePermit",
+      "lightningMiles",
+      "windHoldMph",
+      "weatherServiceBudget",
+      "cancellationReservePct",
+      "heatColdNotes",
+    ].forEach(function (id) {
+      const el = $("#" + id);
+      if (el) el.addEventListener("change", recalculate);
+      if (el && el.type === "number") el.addEventListener("input", recalculate);
+    });
+    // ===== END Safety / Weather listeners =====
+
     $("#btnRecalc").addEventListener("click", recalculate);
     $("#btnReconcile").addEventListener("click", runReconcile);
     $("#btnMC").addEventListener("click", runMonteCarlo);
@@ -604,8 +856,23 @@
       Poster.download(profile, lastPnL);
     });
     $("#btnTemplates").addEventListener("click", () => {
-      const { profile } = readForm();
+      const form = readForm();
+      const profile = Object.assign({}, form.profile, {
+        camping: !!$("#campingOn").checked,
+        N: form.options.N,
+        genre: (form.profile.genre || "").trim ? (form.profile.genre || "").trim() : form.profile.genre || "",
+        marketing_cap: form.options.wizard && form.options.wizard.marketingHardCap,
+        budget_cap: form.profile.budget_cap,
+        talent_cap: form.profile.talent_cap,
+        show_days: form.profile.show_days,
+        talent_names: form.profile.talent_names,
+      });
+      if (!window.XLSX) {
+        flash("SheetJS failed to load — check network / CDN.", "warn");
+        return;
+      }
       Templates.downloadAll(profile);
+      flash("Downloading blank .xlsx pack (sequential)…", "info");
     });
 
     $$(".tabs button").forEach((b) => {
