@@ -1,7 +1,7 @@
-# Festival Forecaster v1.1 — BUILD_STATUS
+# Festival Forecaster v1.2 — BUILD_STATUS
 
 **Date:** 2026-09-15  
-**Status:** Usable SPA + engine PASS at N=7888 + RFID + Safety/Weather optional add-ons (v1.1) + multi-tab blank `.xlsx` pack
+**Status:** Usable SPA + engine PASS at N=7888 + RFID + Safety/Weather + multi-tab blank `.xlsx` pack + **Phase 2 MC journey presentation (ROS gate)**
 
 ## What works
 
@@ -12,20 +12,19 @@
 - **Node self-test PASS:** `node scripts/verify_engine.js` — all dollar cells within $1 of `sheet_targets_at_N0`
 - UI **Reconcile at N=7888** button (same targets)
 - Monte Carlo 5000 draws, presets, P10/P50/P90, tornado, one plain sentence
+- **Phase 2 journey presentation**
+  - ROS gate: Use my ROS | Generate skeleton → Confirm | Edit | Cancel
+  - Run Monte Carlo **disabled** until Confirm ROS
+  - Journey rail (10 stages; camping hidden when off) + OPS + CROWD feeds, pause/scrub, 20–40s clock
+  - Numbers first, then optional Replay P10/P50/P90 + debrief
+  - Curated `js/crowd_bank.js` (no confession xlsx); `filterBanned()`
+  - Health-protocol intensity toggle default OFF (ESA 6ft / 100.4F / 14-day only when ON)
 - Competitors wired to **full** `festivals.json` (26,780) via **fetch** + `CompetitorScore.topN`
-- Stale historical years → badge *"directory match, dates may be stale"*
 - SVG poster download (no fake headliners)
-- **v1.1 blank pack:** SheetJS CDN → multi-tab `.xlsx` workbooks (Talent, Artists marketing, Lineup announce, Go-to-market, ROS per show day, Area hours, Load-in, Transport, RFID/POS, Safety pack). Profile header stamp only; sensitive source details stripped; safety footer disclaimer
+- **v1.1 blank pack:** SheetJS CDN → multi-tab `.xlsx` workbooks
 - localStorage drafts
-- Budget baked in `js/baked_data.js`; festivals **not** baked (~7.7MB)
-- **RFID / Cashless (Basic Scenario)** optional add-on (`rfid_model.json`, `js/rfid_addon.js`)
-  - Checkbox in UI; editable qty table; ASSUMPTION default heuristics
-  - Additive to live forecast opex only; Master Budget G3 / reconcile unchanged when off
-  - `node scripts/verify_rfid.js` — sample subtotal at N=7888 defaults: **$29,792.70**
-- **Safety / Weather** optional add-on (`rain_index.json`, `safety_weather_model.json`, `js/safety_weather.js`)
-  - Checkbox toggle; outside Master Budget G3; UI disclaimer (not legal/safety plan; not NOAA)
-  - Climatology rain_index 1–10 by state+month + city overrides; MC weather driver when outdoor/hybrid
-  - `node scripts/verify_safety_weather.js` — default subtotal N=7888 outdoor camping 3 show days: **$259,553.33**
+- **RFID / Cashless** optional add-on — `node scripts/verify_rfid.js`
+- **Safety / Weather** optional add-on — `node scripts/verify_safety_weather.js`
 
 ## How to open
 
@@ -36,39 +35,25 @@ cd /workspace/forecast_sim_event && python3 -m http.server 4173
 
 ## Gaps / notes
 
-- Default wizard (music focus on, camping on, marketing 16% of opex) **changes** live P&L vs raw sheet; use Reconcile button for baseline PASS table (wizard off, ancillaries unscaled).
+- Default wizard (music focus on, camping on, marketing 16% of opex) **changes** live P&L vs raw sheet; use Reconcile button for baseline PASS table.
 - Directory dates are mostly 2017–2022 → nearly all matches show stale label (expected).
-- Attendance populated on only ~2.7k of 26.8k rows → size_band often inactive.
-- Old GitHub demo `pjrny/forecast_sim_event` intentionally **not** used (wrong ratio math).
-- Iceland ROS under `reference/` is column inspiration only; blank pack does not copy artists.
-- RFID Event Tech HTML-in-docx ignored; Basic Scenario PRICES row implemented as optional add-on (not WRSTBND proposal invention).
-- ESA / safety sheets are **blank checklists** (titles only) — not a safety plan and not legal advice.
+- ESA / safety sheets are **blank checklists** — not a safety plan and not legal advice.
+- Crowd feed is color/narrative only; it does not drive P&L unless echoing an already-applied shock.
 - No login / multi-app / SaaS.
 
-## Paths created/updated
+## Paths created/updated (v1.2)
 
 ```
-index.html                 (SheetJS CDN + blank pack button)
-js/templates.js            (v1.1 multi-tab .xlsx builders)
-js/app.js                  (enriched profile for pack download)
-js/budget_engine.js
-js/monte_carlo.js
-js/competitor_score.js
-js/competitors.js
-js/poster.js
-js/baked_data.js
-js/rfid_addon.js
-js/safety_weather.js
-rfid_model.json
-rain_index.json
-safety_weather_model.json
-scripts/verify_rfid.js
-scripts/verify_safety_weather.js
-scripts/verify_engine.js
-festivals.json
-competitor_score.js
+js/ros_gate.js
+js/crowd_bank.js
+js/ops_bank.js
+js/mc_presentation.js
+js/monte_carlo.js          (pickRepresentativeDraw / drawsDetail — math unchanged)
+js/app.js                  (ROS gate + journey wiring)
+index.html
+css/app.css
 README.md
 BUILD_STATUS.md
 ```
 
-Kept: `budget_model.json`, `reconcile.py`, `reconcile_report.md`, `reference/`.
+Prior v1.1 paths unchanged: engine, RFID, safety_weather, templates, festivals.json, verify_*.js.

@@ -144,3 +144,89 @@ table.rfid-qty td.muted-label { color: var(--muted); font-size: 0.7rem; }
 tr.rfid-row td { vertical-align: middle; }
 tr.addon-row td { color: var(--accent); }
 tr.addon-row.total td { border-top: 1px dashed var(--accent); }
+
+/* ===== Phase 2: ROS gate + MC journey presentation ===== */
+.ros-gate-panel { margin-bottom: 1rem; }
+.ros-table input {
+  width: 100%; padding: 0.3rem 0.4rem; font-size: 0.78rem;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+}
+.ros-table td.ros-day { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); text-align: center; }
+#rosConfirmedBadge { align-self: center; background: #064e3b; border-color: #059669; color: var(--good); }
+
+.mc-journey-shell {
+  margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);
+}
+.journey-toolbar {
+  display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem;
+}
+.journey-clock { font-family: var(--mono); font-size: 0.85rem; color: var(--cyan); }
+.journey-stage-status { font-size: 0.8rem; color: var(--muted); flex: 1; }
+.journey-scrub-label { flex-direction: row; align-items: center; gap: 0.5rem; margin: 0; min-width: 180px; }
+.journey-scrub-label input { width: 140px; }
+.journey-progress-track {
+  height: 4px; background: #0f172a; border-radius: 2px; margin-bottom: 0.75rem; overflow: hidden;
+}
+.journey-progress-bar {
+  height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent2), var(--accent));
+  transition: width 0.05s linear;
+}
+
+.journey-layout {
+  display: grid; grid-template-columns: 180px 1fr; gap: 0.75rem; min-height: 320px;
+}
+@media (max-width: 800px) {
+  .journey-layout { grid-template-columns: 1fr; }
+}
+
+.journey-rail {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  max-height: 420px; overflow-y: auto;
+}
+.journey-stage {
+  border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.55rem;
+  background: var(--bg2); font-size: 0.72rem;
+}
+.journey-stage.active { border-color: var(--accent2); box-shadow: 0 0 0 1px #a78bfa55; }
+.journey-stage .js-label { font-weight: 600; color: var(--text); }
+.journey-stage .js-status { color: var(--muted); margin-top: 0.15rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.journey-stage.status-clear .js-status { color: var(--good); }
+.journey-stage.status-strain .js-status { color: var(--warn); }
+.journey-stage.status-incident .js-status { color: var(--bad); }
+
+.journey-feeds {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+}
+@media (max-width: 720px) {
+  .journey-feeds { grid-template-columns: 1fr; }
+}
+.feed-col h3 { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--accent2); }
+.feed-scroll {
+  height: 360px; overflow-y: auto; border: 1px solid var(--border);
+  border-radius: 8px; background: #0a0f1c; padding: 0.5rem;
+}
+.feed-item {
+  border-bottom: 1px solid #1e293b; padding: 0.45rem 0.25rem; font-size: 0.78rem;
+}
+.feed-item:last-child { border-bottom: none; }
+.feed-meta { color: var(--muted); font-size: 0.68rem; margin-bottom: 0.2rem; }
+.feed-line { line-height: 1.35; }
+.feed-mit { color: var(--cyan); font-size: 0.72rem; margin-top: 0.2rem; }
+.feed-delta { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); margin-top: 0.15rem; }
+
+.feed-item.ops.sev-info .sev { color: var(--cyan); }
+.feed-item.ops.sev-watch .sev { color: var(--warn); }
+.feed-item.ops.sev-incident .sev { color: var(--bad); }
+.feed-item.ops.sev-stop .sev { color: #fff; background: #7f1d1d; padding: 0 0.25rem; border-radius: 4px; }
+
+.feed-item.crowd.mood-happy { border-left: 2px solid var(--good); padding-left: 0.4rem; }
+.feed-item.crowd.mood-strain { border-left: 2px solid var(--warn); padding-left: 0.4rem; }
+.feed-item.crowd.mood-neutral { border-left: 2px solid var(--border); padding-left: 0.4rem; }
+
+.journey-debrief {
+  margin-top: 1rem; padding: 0.85rem; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--panel2);
+}
+.debrief-list { margin: 0.5rem 0 0.75rem; padding-left: 1.1rem; }
+.debrief-list li { margin-bottom: 0.65rem; }
+.debrief-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
