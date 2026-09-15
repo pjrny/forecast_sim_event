@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intercession Arts & Music Festival P&L Simulator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Dark background */
+            color: #c9d1d9; /* Light text */
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem 1rem;
+        }
+        .card {
+            background-color: #161b22; /* Slightly lighter dark card background */
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        .input-field {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 0.5rem 0.75rem;
+        }
+        .btn-primary {
+            background-color: #238636;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+        .profit { color: #238636; }
+        .loss { color: #f85149; }
+        .grid-header {
+            background-color: #202428;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <div class="w-full max-w-4xl space-y-8">
+        <header class="text-center">
+            <h1 class="text-3xl font-bold text-green-400">Intercession Arts & Music Festival: Budget & P&L Simulator</h1>
+            <p class="text-gray-400 mt-2">Modelled for 4 Days, 6 Stages, and a $10M Budget Cap.</p>
+        </header>
+
+        <!-- P&L Scenario Selector -->
+        <div class="card p-6 rounded-xl space-y-4">
+            <h2 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-4">P&L Scenario Selector</h2>
+            <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                <div class="flex-grow">
+                    <label for="scenario-select" class="block text-sm font-medium mb-1">Select Attendance Level:</label>
+                    <select id="scenario-select" class="input-field w-full rounded-lg" onchange="updateForecast()">
+                        <option value="50000">Target Attendance (50,000)</option>
+                        <option value="36131">Break-Even Point (~36,131)</option>
+                        <option value="35000">Low Attendance (35,000)</option>
+                    </select>
+                </div>
+                <div class="flex-grow">
+                    <label for="custom-attendees" class="block text-sm font-medium mb-1">Or Enter Custom Attendees:</label>
+                    <input type="number" id="custom-attendees" min="1" max="50000" placeholder="e.g., 42000" class="input-field w-full rounded-lg" onchange="updateForecast()">
+                </div>
+            </div>
+
+            <!-- Calculated Financial Summary -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                <div class="bg-gray-800 p-3 rounded-lg text-center">
+                    <p class="text-sm text-gray-400">Attendees</p>
+                    <p id="out-attendees" class="text-2xl font-bold text-white">0</p>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg text-center">
+                    <p class="text-sm text-gray-400">Total Revenue</p>
+                    <p id="out-revenue" class="text-2xl font-bold text-white">\$0</p>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg text-center">
+                    <p class="text-sm text-gray-400">Total Expense</p>
+                    <p id="out-expense" class="text-2xl font-bold text-white">\$0</p>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg text-center">
+                    <p class="text-sm text-gray-400">Net Profit / (Loss)</p>
+                    <p id="out-profit" class="text-2xl font-bold" style="color: white;">\$0</p>
+                </div>
+            </div>
+            <p id="warning-message" class="text-red-400 text-center text-sm mt-3 hidden">Warning: Custom attendance may exceed variable budget caps.</p>
+        </div>
+
+        <!-- Budget Detail Section -->
+        <div class="card p-6 rounded-xl">
+            <h2 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-4">Detailed Budget Breakdown (Target 50K)</h2>
+
+            <div class="space-y-6">
+                <!-- Talent & Programming -->
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-green-500">A. Talent & Programming ($1,150,000)</h3>
+                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
+                        <span>Line Item</span>
+                        <span class="text-right">Budget</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Talent Booking (Hard Cap)</span>
+                        <span class="text-right text-red-400 font-semibold">$1,000,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Performer Hospitality & Travel</span>
+                        <span class="text-right">$100,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Day-Time/Family Entertainment</span>
+                        <span class="text-right">$50,000</span>
+                    </div>
+                </div>
+
+                <!-- Site & Production -->
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-green-500">B. Site & Production ($4,525,000)</h3>
+                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
+                        <span>Line Item</span>
+                        <span class="text-right">Budget</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>**Main Stage Production (2x)**</span>
+                        <span class="text-right text-yellow-400 font-semibold">$1,600,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Mid-Tier Stage Production (2x)</span>
+                        <span class="text-right">$600,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Small Stage Production (2x)</span>
+                        <span class="text-right">$200,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Venue Rental / Ground Lease</span>
+                        <span class="text-right">$925,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Power / Generators / Fuel</span>
+                        <span class="text-right">$500,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Art Installations & Decor</span>
+                        <span class="text-right">$350,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Water & Waste Management</span>
+                        <span class="text-right">$150,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Fencing, Barricades, Layout</span>
+                        <span class="text-right">$200,000</span>
+                    </div>
+                </div>
+
+                <!-- Ticketing & Access -->
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-green-500">C. Ticketing & Access Control (Hardware Fixed) ($145,000)</h3>
+                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
+                        <span>Line Item</span>
+                        <span class="text-right">Budget</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Wristbands (Cashless) - $1.50/unit</span>
+                        <span class="text-right">$75,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Box Office Check-in PCs (100x$50/dayx4)</span>
+                        <span class="text-right">$20,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Access Control Scanners (200x$25/dayx4)</span>
+                        <span class="text-right">$20,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Vendor POS Devices (150x$50/dayx4)</span>
+                        <span class="text-right">$30,000</span>
+                    </div>
+                </div>
+
+                <!-- Operations & Safety -->
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-green-500">E. Operations & Safety ($1,200,000)</h3>
+                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
+                        <span>Line Item</span>
+                        <span class="text-right">Budget</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Security / Crowd Control (Est. $15.00 VPP)</span>
+                        <span class="text-right">$750,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Medical / EMT Services (Est. $2.00 VPP)</span>
+                        <span class="text-right">$100,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Insurance & Permits (Fixed)</span>
+                        <span class="text-right">$200,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Staff / Volunteer Management</span>
+                        <span class="text-right">$100,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Admin / Office / Radios</span>
+                        <span class="text-right">$50,000</span>
+                    </div>
+                </div>
+
+                <!-- Marketing & Contingency -->
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-green-500">D, F, G: Marketing & Contingency ($1,675,000)</h3>
+                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
+                        <span>Line Item</span>
+                        <span class="text-right">Budget</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Digital Ad Spend (Social/Search)</span>
+                        <span class="text-right">$1,000,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>PR / Influencer Campaigns</span>
+                        <span class="text-right">$150,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Website / Mobile App Dev/Maint</span>
+                        <span class="text-right">$50,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>Executive Staffing / Overhead</span>
+                        <span class="text-right">$100,000</span>
+                    </div>
+                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
+                        <span>**Contingency Reserve**</span>
+                        <span class="text-right">$380,000</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Currency formatter
+        const formatCurrency = (amount) => {
+            const absAmount = Math.abs(Math.round(amount));
+            const sign = amount < 0 ? '-' : '';
+            return `${sign}$${absAmount.toLocaleString()}`;
+        };
+
+        // --- CONSTANTS FROM BUDGET ANALYSIS ---
+        const TARGET_ATTENDANCE = 50000;
+        const FIXED_BASE_COSTS = 7225000; // Talent, Production, Venue, Marketing, Insurance, Exec Staffing
+        const FIXED_HARDWARE_RENTAL = 70000; // Box Office PCs, Scanners, POS Devices
+        const FIXED_CONTINGENCY = 380000; // Fixed reserve for all scenarios
+        
+        // Per Person Revenue/Cost (Net of Odoo Fee)
+        const REGULAR_TICKET_NET_PRICE = 150 - 6; // $144
+        const VIP_TICKET_NET_PRICE = 500 - 6;     // $494
+        const AVG_TICKET_NET_PRICE = (REGULAR_TICKET_NET_PRICE * 0.9 + VIP_TICKET_NET_PRICE * 0.1); // $179.00
+        const ANCILLARY_REVENUE_PER_PERSON = 81; // F&B, Sponsors, Vendors, Merch / 50K attendees
+        const VARIABLE_COST_PER_PERSON = 50.90; // Wristbands, Security, Medical, F&B COGS, Odoo VPP portion of 6/order
+
+        // Core calculation function
+        function calculateForecast(attendance) {
+            
+            // 1. Calculate Revenue
+            // Assume the 90/10 GA/VIP split holds, and ancillary revenue scales linearly with attendance.
+            const totalNetTicketRevenue = attendance * AVG_TICKET_NET_PRICE;
+            const totalAncillaryRevenue = attendance * ANCILLARY_REVENUE_PER_PERSON;
+            const totalRevenue = totalNetTicketRevenue + totalAncillaryRevenue;
+
+            // 2. Calculate Expenses
+            // Fixed costs are incurred regardless of attendance.
+            const totalVariableCosts = attendance * VARIABLE_COST_PER_PERSON;
+            
+            // We'll treat the hardware rental as Fixed for the sake of the break-even model (since it's a 4-day fixed rental)
+            // But we'll use the VPP to calculate total variable spend based on ticket sales.
+            const totalExpense = FIXED_BASE_COSTS + totalVariableCosts + FIXED_CONTINGENCY;
+
+            // 3. Calculate Profit
+            const netProfit = totalRevenue - totalExpense;
+
+            return {
+                attendance: attendance,
+                totalRevenue: totalRevenue,
+                totalExpense: totalExpense,
+                netProfit: netProfit
+            };
+        }
+
+        // Update UI function
+        function updateUI(results) {
+            const profitEl = document.getElementById('out-profit');
+            
+            document.getElementById('out-attendees').textContent = Math.round(results.attendance).toLocaleString();
+            document.getElementById('out-revenue').textContent = formatCurrency(results.totalRevenue);
+            document.getElementById('out-expense').textContent = formatCurrency(results.totalExpense);
+            
+            profitEl.textContent = formatCurrency(results.netProfit);
+            
+            if (results.netProfit > 0) {
+                profitEl.classList.remove('loss');
+                profitEl.classList.add('profit');
+                profitEl.style.color = '#238636';
+            } else {
+                profitEl.classList.remove('profit');
+                profitEl.classList.add('loss');
+                profitEl.style.color = '#f85149';
+            }
+        }
+
+        // Event handler for selectors/inputs
+        function updateForecast() {
+            const select = document.getElementById('scenario-select');
+            const customInput = document.getElementById('custom-attendees');
+            const warningMessage = document.getElementById('warning-message');
+
+            let attendance = parseFloat(select.value);
+
+            // Check if custom input has a value, override if it does
+            if (customInput.value) {
+                attendance = parseInt(customInput.value);
+            }
+
+            if (isNaN(attendance) || attendance <= 0) {
+                // Default to target attendance if input is cleared/invalid
+                attendance = TARGET_ATTENDANCE;
+                customInput.value = '';
+                select.value = TARGET_ATTENDANCE;
+            }
+
+            if (attendance > TARGET_ATTENDANCE) {
+                 attendance = TARGET_ATTENDANCE;
+                 customInput.value = TARGET_ATTENDANCE;
+                 warningMessage.textContent = "Attendance capped at 50,000 for budgeting stability.";
+                 warningMessage.classList.remove('hidden');
+            } else {
+                 warningMessage.classList.add('hidden');
+            }
+
+            const results = calculateForecast(attendance);
+            updateUI(results);
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            // Set initial scenario to the target (50,000)
+            const initialAttendance = parseFloat(document.getElementById('scenario-select').value);
+            const initialResults = calculateForecast(initialAttendance);
+            updateUI(initialResults);
+        };
+    </script>
+</body>
+</html>

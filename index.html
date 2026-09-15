@@ -1,362 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intercession Arts & Music Festival P&L Simulator</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0d1117; /* Dark background */
-            color: #c9d1d9; /* Light text */
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 2rem 1rem;
-        }
-        .card {
-            background-color: #161b22; /* Slightly lighter dark card background */
-            border: 1px solid #30363d;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        }
-        .input-field {
-            background-color: #0d1117;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 0.5rem 0.75rem;
-        }
-        .btn-primary {
-            background-color: #238636;
-            transition: background-color 0.2s;
-            cursor: pointer;
-        }
-        .btn-primary:hover {
-            background-color: #2ea043;
-        }
-        .profit { color: #238636; }
-        .loss { color: #f85149; }
-        .grid-header {
-            background-color: #202428;
-            font-weight: 600;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Festival Forecaster v1 — Lineup Insurance Pack</title>
+  <link rel="stylesheet" href="css/app.css" />
 </head>
-<body class="bg-gray-900 text-gray-100">
-
-    <div class="w-full max-w-4xl space-y-8">
-        <header class="text-center">
-            <h1 class="text-3xl font-bold text-green-400">Intercession Arts & Music Festival: Budget & P&L Simulator</h1>
-            <p class="text-gray-400 mt-2">Modelled for 4 Days, 6 Stages, and a $10M Budget Cap.</p>
-        </header>
-
-        <!-- P&L Scenario Selector -->
-        <div class="card p-6 rounded-xl space-y-4">
-            <h2 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-4">P&L Scenario Selector</h2>
-            <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-                <div class="flex-grow">
-                    <label for="scenario-select" class="block text-sm font-medium mb-1">Select Attendance Level:</label>
-                    <select id="scenario-select" class="input-field w-full rounded-lg" onchange="updateForecast()">
-                        <option value="50000">Target Attendance (50,000)</option>
-                        <option value="36131">Break-Even Point (~36,131)</option>
-                        <option value="35000">Low Attendance (35,000)</option>
-                    </select>
-                </div>
-                <div class="flex-grow">
-                    <label for="custom-attendees" class="block text-sm font-medium mb-1">Or Enter Custom Attendees:</label>
-                    <input type="number" id="custom-attendees" min="1" max="50000" placeholder="e.g., 42000" class="input-field w-full rounded-lg" onchange="updateForecast()">
-                </div>
-            </div>
-
-            <!-- Calculated Financial Summary -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
-                <div class="bg-gray-800 p-3 rounded-lg text-center">
-                    <p class="text-sm text-gray-400">Attendees</p>
-                    <p id="out-attendees" class="text-2xl font-bold text-white">0</p>
-                </div>
-                <div class="bg-gray-800 p-3 rounded-lg text-center">
-                    <p class="text-sm text-gray-400">Total Revenue</p>
-                    <p id="out-revenue" class="text-2xl font-bold text-white">\$0</p>
-                </div>
-                <div class="bg-gray-800 p-3 rounded-lg text-center">
-                    <p class="text-sm text-gray-400">Total Expense</p>
-                    <p id="out-expense" class="text-2xl font-bold text-white">\$0</p>
-                </div>
-                <div class="bg-gray-800 p-3 rounded-lg text-center">
-                    <p class="text-sm text-gray-400">Net Profit / (Loss)</p>
-                    <p id="out-profit" class="text-2xl font-bold" style="color: white;">\$0</p>
-                </div>
-            </div>
-            <p id="warning-message" class="text-red-400 text-center text-sm mt-3 hidden">Warning: Custom attendance may exceed variable budget caps.</p>
-        </div>
-
-        <!-- Budget Detail Section -->
-        <div class="card p-6 rounded-xl">
-            <h2 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-4">Detailed Budget Breakdown (Target 50K)</h2>
-
-            <div class="space-y-6">
-                <!-- Talent & Programming -->
-                <div class="space-y-2">
-                    <h3 class="text-lg font-bold text-green-500">A. Talent & Programming ($1,150,000)</h3>
-                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
-                        <span>Line Item</span>
-                        <span class="text-right">Budget</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Talent Booking (Hard Cap)</span>
-                        <span class="text-right text-red-400 font-semibold">$1,000,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Performer Hospitality & Travel</span>
-                        <span class="text-right">$100,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Day-Time/Family Entertainment</span>
-                        <span class="text-right">$50,000</span>
-                    </div>
-                </div>
-
-                <!-- Site & Production -->
-                <div class="space-y-2">
-                    <h3 class="text-lg font-bold text-green-500">B. Site & Production ($4,525,000)</h3>
-                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
-                        <span>Line Item</span>
-                        <span class="text-right">Budget</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>**Main Stage Production (2x)**</span>
-                        <span class="text-right text-yellow-400 font-semibold">$1,600,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Mid-Tier Stage Production (2x)</span>
-                        <span class="text-right">$600,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Small Stage Production (2x)</span>
-                        <span class="text-right">$200,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Venue Rental / Ground Lease</span>
-                        <span class="text-right">$925,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Power / Generators / Fuel</span>
-                        <span class="text-right">$500,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Art Installations & Decor</span>
-                        <span class="text-right">$350,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Water & Waste Management</span>
-                        <span class="text-right">$150,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Fencing, Barricades, Layout</span>
-                        <span class="text-right">$200,000</span>
-                    </div>
-                </div>
-
-                <!-- Ticketing & Access -->
-                <div class="space-y-2">
-                    <h3 class="text-lg font-bold text-green-500">C. Ticketing & Access Control (Hardware Fixed) ($145,000)</h3>
-                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
-                        <span>Line Item</span>
-                        <span class="text-right">Budget</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Wristbands (Cashless) - $1.50/unit</span>
-                        <span class="text-right">$75,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Box Office Check-in PCs (100x$50/dayx4)</span>
-                        <span class="text-right">$20,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Access Control Scanners (200x$25/dayx4)</span>
-                        <span class="text-right">$20,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Vendor POS Devices (150x$50/dayx4)</span>
-                        <span class="text-right">$30,000</span>
-                    </div>
-                </div>
-
-                <!-- Operations & Safety -->
-                <div class="space-y-2">
-                    <h3 class="text-lg font-bold text-green-500">E. Operations & Safety ($1,200,000)</h3>
-                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
-                        <span>Line Item</span>
-                        <span class="text-right">Budget</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Security / Crowd Control (Est. $15.00 VPP)</span>
-                        <span class="text-right">$750,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Medical / EMT Services (Est. $2.00 VPP)</span>
-                        <span class="text-right">$100,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Insurance & Permits (Fixed)</span>
-                        <span class="text-right">$200,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Staff / Volunteer Management</span>
-                        <span class="text-right">$100,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Admin / Office / Radios</span>
-                        <span class="text-right">$50,000</span>
-                    </div>
-                </div>
-
-                <!-- Marketing & Contingency -->
-                <div class="space-y-2">
-                    <h3 class="text-lg font-bold text-green-500">D, F, G: Marketing & Contingency ($1,675,000)</h3>
-                    <div class="grid grid-cols-2 grid-header p-2 rounded-t-lg">
-                        <span>Line Item</span>
-                        <span class="text-right">Budget</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Digital Ad Spend (Social/Search)</span>
-                        <span class="text-right">$1,000,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>PR / Influencer Campaigns</span>
-                        <span class="text-right">$150,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Website / Mobile App Dev/Maint</span>
-                        <span class="text-right">$50,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>Executive Staffing / Overhead</span>
-                        <span class="text-right">$100,000</span>
-                    </div>
-                    <div class="grid grid-cols-2 p-2 border-b border-gray-800">
-                        <span>**Contingency Reserve**</span>
-                        <span class="text-right">$380,000</span>
-                    </div>
-                </div>
-
-            </div>
-        </div>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <h1>Festival Forecaster <span style="color:var(--accent)">v1</span></h1>
+      <div class="tag">Lineup Insurance Pack · Patron Journey · Master Budget engine (not ratio hacks)</div>
     </div>
+    <div class="header-actions">
+      <button type="button" id="btnSave" class="ghost" title="Save draft to localStorage">Save draft</button>
+      <button type="button" id="btnLoad" class="ghost">Load draft</button>
+      <button type="button" id="btnReconcile" class="primary" title="Assert sheet_targets_at_N0 within $1">Reconcile at N=7888</button>
+      <button type="button" id="btnRecalc">Recalculate</button>
+    </div>
+  </header>
 
-    <script>
-        // Currency formatter
-        const formatCurrency = (amount) => {
-            const absAmount = Math.abs(Math.round(amount));
-            const sign = amount < 0 ? '-' : '';
-            return `${sign}$${absAmount.toLocaleString()}`;
-        };
+  <div id="flash" class="banner info" hidden style="margin:0.75rem 1.5rem"></div>
 
-        // --- CONSTANTS FROM BUDGET ANALYSIS ---
-        const TARGET_ATTENDANCE = 50000;
-        const FIXED_BASE_COSTS = 7225000; // Talent, Production, Venue, Marketing, Insurance, Exec Staffing
-        const FIXED_HARDWARE_RENTAL = 70000; // Box Office PCs, Scanners, POS Devices
-        const FIXED_CONTINGENCY = 380000; // Fixed reserve for all scenarios
-        
-        // Per Person Revenue/Cost (Net of Odoo Fee)
-        const REGULAR_TICKET_NET_PRICE = 150 - 6; // $144
-        const VIP_TICKET_NET_PRICE = 500 - 6;     // $494
-        const AVG_TICKET_NET_PRICE = (REGULAR_TICKET_NET_PRICE * 0.9 + VIP_TICKET_NET_PRICE * 0.1); // $179.00
-        const ANCILLARY_REVENUE_PER_PERSON = 81; // F&B, Sponsors, Vendors, Merch / 50K attendees
-        const VARIABLE_COST_PER_PERSON = 50.90; // Wristbands, Security, Medical, F&B COGS, Odoo VPP portion of 6/order
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="card">
+        <h2>Event profile</h2>
+        <label>Festival name
+          <input type="text" id="festName" placeholder="Name" />
+        </label>
+        <div class="grid-2">
+          <label>Start <input type="date" id="startDate" /></label>
+          <label>End <input type="date" id="endDate" /></label>
+        </div>
+        <div class="grid-2">
+          <label>City <input type="text" id="city" /></label>
+          <label>State <input type="text" id="state" maxlength="2" placeholder="ST" /></label>
+        </div>
+        <div class="grid-2">
+          <label>Type <input type="text" id="festType" placeholder="Music" /></label>
+          <label>Subtype <input type="text" id="festSubtype" placeholder="Camping" /></label>
+        </div>
+      </section>
 
-        // Core calculation function
-        function calculateForecast(attendance) {
-            
-            // 1. Calculate Revenue
-            // Assume the 90/10 GA/VIP split holds, and ancillary revenue scales linearly with attendance.
-            const totalNetTicketRevenue = attendance * AVG_TICKET_NET_PRICE;
-            const totalAncillaryRevenue = attendance * ANCILLARY_REVENUE_PER_PERSON;
-            const totalRevenue = totalNetTicketRevenue + totalAncillaryRevenue;
+      <section class="card">
+        <h2>Scenario <span class="cell-ref" title="K1 attendees">K1</span></h2>
+        <label>Attendance N
+          <input type="number" id="attendance" min="1" step="1" />
+        </label>
+        <div class="grid-2">
+          <label>Ticket $<span class="cell-ref" title="K7">K7</span>
+            <input type="number" id="ticketPrice" min="0" step="1" />
+          </label>
+          <label>Camp fee $<span class="cell-ref" title="K6">K6</span>
+            <input type="number" id="campFee" min="0" step="0.5" />
+          </label>
+        </div>
+        <label>Camp mix % <span class="cell-ref" title="K8">K8</span>
+          <input type="number" id="pCamp" min="0" max="100" step="1" />
+        </label>
+        <label class="row"><input type="checkbox" id="scaleAncillaries" checked /> Scale ancillaries × N/N0</label>
+      </section>
 
-            // 2. Calculate Expenses
-            // Fixed costs are incurred regardless of attendance.
-            const totalVariableCosts = attendance * VARIABLE_COST_PER_PERSON;
-            
-            // We'll treat the hardware rental as Fixed for the sake of the break-even model (since it's a 4-day fixed rental)
-            // But we'll use the VPP to calculate total variable spend based on ticket sales.
-            const totalExpense = FIXED_BASE_COSTS + totalVariableCosts + FIXED_CONTINGENCY;
+      <section class="card">
+        <h2>Wizard modifiers</h2>
+        <div class="wizard-toggles">
+          <label><input type="checkbox" id="musicFocus" checked /> Music focus (talent ×1.5 / off ×0.5)</label>
+          <label><input type="checkbox" id="experienceFocus" /> Experience focus (prod ×2, talent ×0.25)</label>
+          <label><input type="checkbox" id="campingOn" checked /> Camping on (site + annual ops ×1.10)</label>
+          <label><input type="checkbox" id="lastMinute" /> Last-minute production (prod ×1.20)</label>
+        </div>
+        <label style="margin-top:0.75rem">Marketing % of opex <span id="marketingPctLabel">16%</span>
+          <input type="range" id="marketingPct" min="5" max="40" value="16" />
+        </label>
+        <div class="slider-meta"><span>5%</span><span>default 16%</span><span>40%</span></div>
+        <label>Marketing hard cap $ <span class="cell-ref" title="Does not invent revenue">optional</span>
+          <input type="number" id="marketingCap" min="0" step="100" placeholder="No cap" />
+        </label>
+      </section>
 
-            // 3. Calculate Profit
-            const netProfit = totalRevenue - totalExpense;
 
-            return {
-                attendance: attendance,
-                totalRevenue: totalRevenue,
-                totalExpense: totalExpense,
-                netProfit: netProfit
-            };
-        }
+      <section class="card" id="rfidCard">
+        <h2>RFID / POS add-on</h2>
+        <label class="row"><input type="checkbox" id="rfidEnabled" /> RFID / POS add-on (Basic Scenario)</label>
+        <p class="footer-note" style="text-align:left;padding:0.25rem 0;margin:0">
+          Unit prices from Tool Basic Scenario Calculator — not Master Budget. Additive to live forecast opex only.
+        </p>
+        <label style="margin-top:0.5rem">Cashless mode <span class="cell-ref" title="Display context only — does not change unit prices in v1">v1 display</span>
+          <select id="cashlessMode">
+            <option value="none">None</option>
+            <option value="closed">Closed loop</option>
+            <option value="open">Open loop</option>
+            <option value="hybrid" selected>Hybrid</option>
+          </select>
+        </label>
+        <div id="rfidQtyPanel" hidden>
+          <div class="rfid-table-wrap">
+            <table class="pnl rfid-qty" id="rfidQtyTable">
+              <thead>
+                <tr><th>Line</th><th class="num">Unit $</th><th class="num">Qty</th><th class="num">Extended</th></tr>
+              </thead>
+              <tbody id="rfidQtyBody"></tbody>
+              <tfoot>
+                <tr class="total"><td colspan="3">RFID / Cashless subtotal</td><td class="num" id="rfidSubtotal">$0.00</td></tr>
+              </tfoot>
+            </table>
+          </div>
+          <p class="banner info" id="rfidAssumption" style="margin-top:0.5rem"></p>
+          <p class="footer-note" style="text-align:left;padding:0.25rem 0" id="rfidPassthrough"></p>
+        </div>
+      </section>
 
-        // Update UI function
-        function updateUI(results) {
-            const profitEl = document.getElementById('out-profit');
-            
-            document.getElementById('out-attendees').textContent = Math.round(results.attendance).toLocaleString();
-            document.getElementById('out-revenue').textContent = formatCurrency(results.totalRevenue);
-            document.getElementById('out-expense').textContent = formatCurrency(results.totalExpense);
-            
-            profitEl.textContent = formatCurrency(results.netProfit);
-            
-            if (results.netProfit > 0) {
-                profitEl.classList.remove('loss');
-                profitEl.classList.add('profit');
-                profitEl.style.color = '#238636';
-            } else {
-                profitEl.classList.remove('profit');
-                profitEl.classList.add('loss');
-                profitEl.style.color = '#f85149';
-            }
-        }
+      <section class="card">
+        <h2>Pack outputs</h2>
+        <div style="display:flex;flex-direction:column;gap:0.4rem">
+          <button type="button" id="btnPoster" class="primary">Download SVG poster</button>
+          <button type="button" id="btnTemplates">Download blank ops templates</button>
+          <p class="footer-note" style="text-align:left;padding:0.25rem 0">
+            ROS blank columns: time, area, action, owner, notes — header name/dates/city only. No artist copy from Iceland example.
+          </p>
+        </div>
+      </section>
+    </aside>
 
-        // Event handler for selectors/inputs
-        function updateForecast() {
-            const select = document.getElementById('scenario-select');
-            const customInput = document.getElementById('custom-attendees');
-            const warningMessage = document.getElementById('warning-message');
+    <main class="main">
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="label">Ticket revenue <span class="cell-ref" title="K22 = N·p_camp·P_camper + N·(1−p_camp)·P_noncamper">K22</span></div>
+          <div class="value" id="kpiRevenue">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Total opex <span class="cell-ref" title="G3">G3</span></div>
+          <div class="value" id="kpiOpex">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Pre-ancillary profit <span class="cell-ref" title="K24 = K22 − G3">K24</span></div>
+          <div class="value" id="kpiK24">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Full profit <span class="cell-ref" title="K47">K47</span></div>
+          <div class="value" id="kpiK47">—</div>
+        </div>
+      </div>
 
-            let attendance = parseFloat(select.value);
+      <section class="card">
+        <div class="tabs">
+          <button type="button" data-panel="pnl" class="active">P&amp;L</button>
+          <button type="button" data-panel="montecarlo">Monte Carlo</button>
+          <button type="button" data-panel="competitors">Competitors</button>
+          <button type="button" data-panel="reconcile">Reconcile</button>
+        </div>
 
-            // Check if custom input has a value, override if it does
-            if (customInput.value) {
-                attendance = parseInt(customInput.value);
-            }
+        <div id="panel-pnl" class="panel-stack active">
+          <h2>Deterministic P&amp;L <span class="cell-ref">workbook model</span></h2>
+          <div id="pnlTable"></div>
+        </div>
 
-            if (isNaN(attendance) || attendance <= 0) {
-                // Default to target attendance if input is cleared/invalid
-                attendance = TARGET_ATTENDANCE;
-                customInput.value = '';
-                select.value = TARGET_ATTENDANCE;
-            }
+        <div id="panel-montecarlo" class="panel-stack">
+          <h2>Monte Carlo band</h2>
+          <div class="grid-2" style="align-items:end;margin-bottom:0.75rem">
+            <label>Preset
+              <select id="mcPreset">
+                <option value="conservative">Conservative (−25% / +5% attn)</option>
+                <option value="base" selected>Base (−15% / +10%)</option>
+                <option value="aggressive">Aggressive (−8% / +18%)</option>
+              </select>
+            </label>
+            <button type="button" id="btnMC" class="primary">Run 5,000 draws</button>
+          </div>
+          <p id="mcStatus" class="footer-note" style="text-align:left"></p>
+          <p id="mcSentence" style="font-size:0.95rem;line-height:1.45;margin:0.5rem 0 1rem"></p>
+          <div class="kpi-row" style="margin-bottom:1rem">
+            <div class="kpi"><div class="label">P10 net</div><div class="value" id="mcP10">—</div></div>
+            <div class="kpi"><div class="label">P50 net</div><div class="value" id="mcP50">—</div></div>
+            <div class="kpi"><div class="label">P90 net</div><div class="value" id="mcP90">—</div></div>
+            <div class="kpi"><div class="label">P(profit&gt;0) / P(tickets≥opex)</div>
+              <div class="value" style="font-size:1.1rem"><span id="mcPProfit">—</span> · <span id="mcPCover">—</span></div>
+            </div>
+          </div>
+          <h3>Tornado (swing)</h3>
+          <div class="tornado" id="tornado"></div>
+        </div>
 
-            if (attendance > TARGET_ATTENDANCE) {
-                 attendance = TARGET_ATTENDANCE;
-                 customInput.value = TARGET_ATTENDANCE;
-                 warningMessage.textContent = "Attendance capped at 50,000 for budgeting stability.";
-                 warningMessage.classList.remove('hidden');
-            } else {
-                 warningMessage.classList.add('hidden');
-            }
+        <div id="panel-competitors" class="panel-stack">
+          <h2>Competitor matches <span class="cell-ref">Top 8</span></h2>
+          <div id="competitorList"></div>
+        </div>
 
-            const results = calculateForecast(attendance);
-            updateUI(results);
-        }
+        <div id="panel-reconcile" class="panel-stack">
+          <h2>Reconcile vs sheet_targets_at_N0</h2>
+          <p class="footer-note" style="text-align:left">Uses engine at N=7888 with no wizard modifiers; ancillaries unscaled (sheet K33:K45 literals). CC fees C54 = 0.03×K22 dynamically.</p>
+          <div id="reconcileBox"><p class="banner info">Click “Reconcile at N=7888” in the header.</p></div>
+        </div>
+      </section>
+    </main>
+  </div>
 
-        // Initialize on load
-        window.onload = function() {
-            // Set initial scenario to the target (50,000)
-            const initialAttendance = parseFloat(document.getElementById('scenario-select').value);
-            const initialResults = calculateForecast(initialAttendance);
-            updateUI(initialResults);
-        };
-    </script>
+  <p class="footer-note">
+    Oscar Voigt / Patron Journey · Festival Forecaster v1 · localStorage drafts only · no login · engine from reconciled budget_model.json
+  </p>
+
+  <script src="js/baked_data.js"></script>
+  <script src="js/budget_engine.js"></script>
+  <script src="js/monte_carlo.js"></script>
+  <script src="js/competitor_score.js"></script>
+  <script src="js/competitors.js"></script>
+  <script src="js/poster.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/rfid_addon.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
