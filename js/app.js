@@ -1,5 +1,5 @@
 /**
- * Festival Forecaster v1.2 — Lineup Insurance Pack + MC journey presentation
+ * Festival Forecaster v1.3 — Accuracy then UX (tiers, sponsors, AX stepper)
  * localStorage drafts only; baked JSON; no login.
  */
 (function () {
@@ -12,6 +12,12 @@
   let lastMC = null;
   let rosGate = null;
   let mcPres = null;
+  let currentAxStep = 1;
+  let baselineMode = false; // Reset-to-sheet: empty wizard, no marketing slider
+  let tierRows = []; // working tier table
+  let sponsorRows = [];
+  let boothRows = [];
+  let sheetBaseline = null; // raw sheet KPIs at N0 for ledger
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -36,8 +42,76 @@
     });
   }
 
+  function syncSheetTiersIfNeeded(N, ticket, camp_fee, p_camp) {
+    const tiersOn = !!( $("#tiersEnabled") && $("#tiersEnabled").checked );
+    if (!tiersOn || !model || typeof TicketTiers === "undefined") return;
+    const allSheet =
+      tierRows.length &&
+      tierRows.every(function (t) {
+        return t.source === "sheet";
+      });
+    if (!allSheet && tierRows.length) return;
+    const defs = Object.assign({}, model.defaults, {
+      ticket: ticket,
+      camp_fee: camp_fee,
+      p_camp: p_camp,
+    });
+    tierRows = TicketTiers.defaultTiersFromSheet(defs, N);
+  }
+
   function readForm() {
     const marketingPct = Number($("#marketingPct").value);
+    let N = Number($("#attendance").value) || (model && model.baseline.N0) || 0;
+    const limitOn = !!( $("#limitRegEnabled") && $("#limitRegEnabled").checked );
+    const limitVal = limitOn && $("#limitRegistrations") && $("#limitRegistrations").value
+      ? Number($("#limitRegistrations").value)
+      : 0;
+    if (limitOn && limitVal > 0 && typeof TicketTiers !== "undefined") {
+      N = TicketTiers.applyLimitRegistrations(N, limitVal);
+    }
+
+    const ticket = Number($("#ticketPrice").value);
+    const camp_fee = Number($("#campFee").value);
+    const p_camp = Number($("#pCamp").value) / 100;
+    syncSheetTiersIfNeeded(N, ticket, camp_fee, p_camp);
+
+    const wizard = baselineMode
+      ? {}
+      : {
+          musicFocus: $("#musicFocus").checked ? "yes" : "no",
+          experienceFocus: $("#experienceFocus").checked ? "yes" : false,
+          camping: $("#campingOn").checked ? "on" : false,
+          lastMinuteProduction: $("#lastMinute").checked,
+          marketingPct: marketingPct,
+          marketingHardCap: $("#marketingCap").value
+            ? Number($("#marketingCap").value)
+            : null,
+        };
+
+    const tiersOn = !!( $("#tiersEnabled") && $("#tiersEnabled").checked );
+    let tiersPayload = { enabled: false, rows: tierRows.slice() };
+    let ticketBuild = null;
+    if (tiersOn && typeof TicketTiers !== "undefined") {
+      const campSep = !!( $("#campSeparate") && $("#campSeparate").checked );
+      const trev = TicketTiers.computeTierRevenue(tierRows, {
+        enabled: true,
+        N: N,
+        camp_separate: campSep,
+        camp_fee: camp_fee,
+        p_camp: p_camp,
+      });
+      tiersPayload = {
+        enabled: true,
+        rows: trev.tiers,
+        error: trev.error,
+        revenue: trev.revenue,
+        reconstruction_note: trev.reconstruction_note,
+      };
+      ticketBuild = trev.ticketBuild;
+    }
+
+    const sponsorsOn = !!( $("#sponsorsEnabled") && $("#sponsorsEnabled").checked );
+
     return {
       profile: {
         name: $("#festName").value.trim(),
@@ -48,23 +122,27 @@
         type: $("#festType").value.trim(),
         subtype: $("#festSubtype").value.trim(),
         camping: $("#campingOn").checked,
-        N: Number($("#attendance").value) || 0,
+        N: N,
+        timezone: $("#timezone") ? $("#timezone").value.trim() : "",
+        venue: $("#venue") ? $("#venue").value.trim() : "",
+        organizer: $("#organizer") ? $("#organizer").value.trim() : "",
+        limit_registrations: limitOn && limitVal > 0 ? limitVal : null,
       },
       options: {
-        N: Number($("#attendance").value) || model.baseline.N0,
-        ticket: Number($("#ticketPrice").value),
-        camp_fee: Number($("#campFee").value),
-        p_camp: Number($("#pCamp").value) / 100,
+        N: N,
+        ticket: ticket,
+        camp_fee: camp_fee,
+        p_camp: p_camp,
         scaleAncillaries: $("#scaleAncillaries").checked,
-        wizard: {
-          musicFocus: $("#musicFocus").checked ? "yes" : "no",
-          experienceFocus: $("#experienceFocus").checked ? "yes" : false,
-          camping: $("#campingOn").checked ? "on" : false,
-          lastMinuteProduction: $("#lastMinute").checked,
-          marketingPct: marketingPct,
-          marketingHardCap: $("#marketingCap").value
-            ? Number($("#marketingCap").value)
-            : null,
+        wizard: wizard,
+        ticketBuild: ticketBuild,
+        limit_registrations: limitOn && limitVal > 0 ? limitVal : null,
+        tiers: tiersPayload,
+        sponsorsBooths: {
+          enabled: sponsorsOn,
+          sponsors: sponsorRows.slice(),
+          booths: boothRows.slice(),
+          site_cost: $("#sponsorSiteCost") ? Number($("#sponsorSiteCost").value) || 0 : 0,
         },
       },
       mcPreset: $("#mcPreset").value,
@@ -73,9 +151,8 @@
         cashlessMode: $("#cashlessMode") ? $("#cashlessMode").value : "hybrid",
         qtyOverrides: readRfidQtyOverrides(),
       },
-      // ===== BEGIN Safety / Weather form =====
       safetyWeather: readSafetyWeatherForm(),
-      // ===== END Safety / Weather form =====
+      baselineMode: baselineMode,
     };
   }
 
@@ -172,6 +249,26 @@
     if ($("#heatColdNotes")) $("#heatColdNotes").value = "";
     window.__swQtyOverrides = {};
     // ===== END Safety / Weather defaults =====
+    if ($("#tiersEnabled")) $("#tiersEnabled").checked = false;
+    if ($("#campSeparate")) $("#campSeparate").checked = false;
+    if ($("#tiersPanel")) $("#tiersPanel").hidden = true;
+    if ($("#limitRegEnabled")) $("#limitRegEnabled").checked = false;
+    if ($("#limitRegWrap")) $("#limitRegWrap").hidden = true;
+    if ($("#limitRegistrations")) $("#limitRegistrations").value = "";
+    if ($("#sponsorsEnabled")) $("#sponsorsEnabled").checked = false;
+    if ($("#sponsorsPanel")) $("#sponsorsPanel").hidden = true;
+    if ($("#sponsorSiteCost")) $("#sponsorSiteCost").value = 0;
+    if ($("#timezone")) $("#timezone").value = "";
+    if ($("#venue")) $("#venue").value = "";
+    if ($("#organizer")) $("#organizer").value = "";
+    sponsorRows = [];
+    boothRows = [];
+    baselineMode = false;
+    if (model && typeof TicketTiers !== "undefined") {
+      tierRows = TicketTiers.defaultTiersFromSheet(model.defaults, model.baseline.N0);
+    } else {
+      tierRows = [];
+    }
   }
 
   function saveDraft() {
@@ -285,7 +382,7 @@
       if (money) el.classList.add(val >= 0 ? "pos" : "neg");
     };
     setKpi("#kpiRevenue", r.K22, true);
-    setKpi("#kpiOpex", r.total_opex != null ? r.total_opex : r.G3, true);
+    setKpi("#kpiOpex", r.G3_master != null ? r.G3_master : r.G3, true);
     setKpi("#kpiK24", r.K24, true);
     setKpi("#kpiK47", r.K47, true);
 
@@ -334,10 +431,18 @@
         "</td></tr>";
     }
     // ===== END Safety / Weather P&L rows =====
-    if (hasRfid || hasSw) {
+    const hasSb = r.sponsors_booths_enabled && r.sponsors_booths;
+    if (hasSb && r.sponsors_booths_site_cost > 0) {
+      html +=
+        "<tr class='addon-row'><td>Sponsors site cost <span class='cell-ref'>addon</span></td><td class='cell'>SB</td><td class='num'>" +
+        fmtMoney2(r.sponsors_booths_site_cost) +
+        "</td></tr>";
+    }
+    if (hasRfid || hasSw || (hasSb && r.sponsors_booths_site_cost > 0)) {
       const parts = ["G3"];
       if (hasRfid) parts.push("RFID");
       if (hasSw) parts.push("Safety/Weather");
+      if (hasSb && r.sponsors_booths_site_cost > 0) parts.push("Sponsor site");
       html +=
         "<tr class='total addon-row'><td>Total opex (live = " +
         parts.join(" + ") +
@@ -379,6 +484,12 @@
       "<tr class='sub'><td>+ Ancillaries</td><td class='cell'>K33:K45</td><td class='num'>" +
       fmtMoney2(r.ancTotal) +
       "</td></tr>";
+    if (hasSb && r.sponsors_booths_income > 0) {
+      html +=
+        "<tr class='sub addon-row'><td>+ Sponsors / booths income <span class='cell-ref'>addon</span></td><td class='cell'>SB</td><td class='num'>" +
+        fmtMoney2(r.sponsors_booths_income) +
+        "</td></tr>";
+    }
     html +=
       "<tr class='total'><td>Full profit</td><td class='cell'>K47</td><td class='num'>" +
       fmtMoney2(r.K47) +
@@ -426,6 +537,340 @@
     profile.N = r.N;
   }
 
+
+  function clearBaselineMode() {
+    if (baselineMode) {
+      baselineMode = false;
+    }
+  }
+
+  function goAxStep(step) {
+    step = Number(step) || 1;
+    currentAxStep = step;
+    $$(".ax-step").forEach(function (b) {
+      b.classList.toggle("active", Number(b.dataset.step) === step);
+    });
+    $$(".ax-panel").forEach(function (p) {
+      const ax = Number(p.dataset.ax);
+      const show = ax === step;
+      p.hidden = !show;
+      p.classList.toggle("active", show);
+    });
+    $$(".ax-main-panel").forEach(function (p) {
+      const keys = String(p.dataset.axMain || "").split(",").map(Number);
+      const show = keys.indexOf(step) !== -1;
+      p.hidden = !show;
+    });
+  }
+
+  function ensureSheetBaseline() {
+    if (!model || sheetBaseline) return;
+    const rep = BudgetEngine.reconcileAtN0(model);
+    sheetBaseline = {
+      N: model.baseline.N0,
+      K22: rep.result.K22,
+      G3: rep.result.G3,
+      K24: rep.result.K24,
+      K47: rep.result.K47,
+      cells: Object.assign({}, rep.result.cells),
+    };
+  }
+
+  function resetToSheet() {
+    if (!model) return;
+    applyDefaultsToForm();
+    baselineMode = true;
+    // Raw sheet: no wizard multipliers, no marketing slider, ancillaries unscaled
+    $("#musicFocus").checked = false;
+    $("#experienceFocus").checked = false;
+    $("#campingOn").checked = false;
+    $("#lastMinute").checked = false;
+    $("#scaleAncillaries").checked = false;
+    if ($("#tiersEnabled")) $("#tiersEnabled").checked = false;
+    if ($("#tiersPanel")) $("#tiersPanel").hidden = true;
+    if ($("#sponsorsEnabled")) $("#sponsorsEnabled").checked = false;
+    if ($("#sponsorsPanel")) $("#sponsorsPanel").hidden = true;
+    if ($("#rfidEnabled")) $("#rfidEnabled").checked = false;
+    if ($("#safetyWeatherEnabled")) $("#safetyWeatherEnabled").checked = false;
+    if ($("#limitRegEnabled")) $("#limitRegEnabled").checked = false;
+    if ($("#limitRegWrap")) $("#limitRegWrap").hidden = true;
+    window.__rfidQtyOverrides = {};
+    window.__swQtyOverrides = {};
+    sponsorRows = [];
+    boothRows = [];
+    tierRows = TicketTiers.defaultTiersFromSheet(model.defaults, model.baseline.N0);
+    if (rosGate && rosGate.isConfirmed()) {
+      try { rosGate.edit(); } catch (e) {}
+    }
+    recalculate();
+    flash("Reset to sheet N=" + model.baseline.N0 + " (raw KPIs; wizard/addons off).", "info");
+  }
+
+  function renderAssumptionLedger(r, form) {
+    ensureSheetBaseline();
+    const box = $("#assumptionLedger");
+    if (!box || !sheetBaseline) return;
+    const w = (form && form.options && form.options.wizard) || {};
+    const rows = [];
+    function add(label, active, detail, source) {
+      rows.push({ label: label, active: !!active, detail: detail || "", source: source || "wizard" });
+    }
+    add("Music focus talent×1.5", w.musicFocus === "yes" || w.musicFocus === true, "off → ×0.5 when unchecked (not omit)", "wizard");
+    add("Experience focus", w.experienceFocus === "yes" || w.experienceFocus === true, "prod×2, talent×0.25", "wizard");
+    add("Camping ×1.10", w.camping === "on" || w.camping === true, "site + annual ops", "wizard");
+    add("Last-minute ×1.20", !!w.lastMinuteProduction, "production", "wizard");
+    add("Marketing % slider", w.marketingPct != null, (w.marketingPct != null ? w.marketingPct + "% ASSUMPTION / not G6:G33" : ""), "wizard");
+    add("RFID add-on", form && form.rfid && form.rfid.enabled, r.rfid_subtotal ? fmtMoney2(r.rfid_subtotal) : "", "addon");
+    add("Safety / Weather", form && form.safetyWeather && form.safetyWeather.enabled, r.safety_weather_subtotal ? fmtMoney2(r.safety_weather_subtotal) : "", "addon");
+    add("Ticket tiers", form && form.options && form.options.tiers && form.options.tiers.enabled, form && form.options.tiers && form.options.tiers.reconstruction_note, "odoo-tier");
+    add("Sponsors / Booths", r.sponsors_booths_enabled, r.sponsors_booths_income ? ("income " + fmtMoney2(r.sponsors_booths_income)) : "", "addon");
+    add("Limit Registrations", !!(form && form.options && form.options.limit_registrations), form && form.options && form.options.limit_registrations ? ("cap " + form.options.limit_registrations) : "", "wizard");
+    add("Baseline mode (sheet)", baselineMode, "empty wizard; marketing slider ignored", "sheet");
+
+    const dK22 = r.K22 - sheetBaseline.K22;
+    const dG3 = (r.G3_master != null ? r.G3_master : r.G3) - sheetBaseline.G3;
+    const dK24 = r.K24 - sheetBaseline.K24;
+    const dK47 = r.K47 - sheetBaseline.K47;
+    const liveDiff =
+      Math.abs(dK22) > 1 || Math.abs(dG3) > 1 || Math.abs(dK24) > 1 || Math.abs(dK47) > 1 || !baselineMode;
+
+    let html = "<table class='pnl ledger'><thead><tr><th>Assumption</th><th>On?</th><th>Detail</th><th>src</th></tr></thead><tbody>";
+    rows.forEach(function (row) {
+      html +=
+        "<tr><td>" +
+        escapeHtml(row.label) +
+        "</td><td>" +
+        (row.active ? "YES" : "—") +
+        "</td><td style='font-size:0.75rem;color:var(--muted)'>" +
+        escapeHtml(row.detail || "") +
+        "</td><td class='cell'>" +
+        escapeHtml(row.source) +
+        "</td></tr>";
+    });
+    html += "</tbody></table>";
+    html +=
+      "<p class='footer-note' style='text-align:left;padding:0.35rem 0'>Δ vs raw sheet @ N0=" +
+      sheetBaseline.N +
+      ": K22 " +
+      fmtMoney2(dK22) +
+      " · G3 " +
+      fmtMoney2(dG3) +
+      " · K24 " +
+      fmtMoney2(dK24) +
+      " · K47 " +
+      fmtMoney2(dK47) +
+      " (live N=" +
+      r.N +
+      ")</p>";
+    box.innerHTML = html;
+
+    const ban = $("#liveDeltaBanner");
+    if (ban) {
+      // Show when live KPIs diverge from raw sheet path OR modifiers on
+      const rawish =
+        baselineMode &&
+        Math.abs(r.N - sheetBaseline.N) < 0.5 &&
+        Math.abs(r.K22 - sheetBaseline.K22) <= 1 &&
+        Math.abs((r.G3_master != null ? r.G3_master : r.G3) - sheetBaseline.G3) <= 1 &&
+        Math.abs(r.K47 - sheetBaseline.K47) <= 1;
+      ban.hidden = !!rawish;
+    }
+  }
+
+  function renderTiersPanel(r, form) {
+    const enabled = $("#tiersEnabled") && $("#tiersEnabled").checked;
+    const panel = $("#tiersPanel");
+    if (!panel) return;
+    panel.hidden = !enabled;
+    if (!enabled) {
+      if ($("#tiersError")) $("#tiersError").hidden = true;
+      return;
+    }
+    if (!tierRows.length && model) {
+      tierRows = TicketTiers.defaultTiersFromSheet(model.defaults, form.options.N);
+    }
+    const body = $("#tiersBody");
+    let html = "";
+    tierRows.forEach(function (t, i) {
+      html +=
+        "<tr><td><input type='text' data-ti='" +
+        i +
+        "' data-f='name' value='" +
+        escapeHtml(t.name) +
+        "' /></td>" +
+        "<td class='num'><input type='number' step='0.01' data-ti='" +
+        i +
+        "' data-f='price' value='" +
+        t.price +
+        "' /></td>" +
+        "<td class='num'><input type='number' step='1' data-ti='" +
+        i +
+        "' data-f='max' value='" +
+        (t.max != null ? t.max : "") +
+        "' /></td>" +
+        "<td><input type='date' data-ti='" +
+        i +
+        "' data-f='sales_start' value='" +
+        escapeHtml(t.sales_start || "") +
+        "' /></td>" +
+        "<td><input type='date' data-ti='" +
+        i +
+        "' data-f='sales_end' value='" +
+        escapeHtml(t.sales_end || "") +
+        "' /></td>" +
+        "<td class='num'><input type='number' step='1' data-ti='" +
+        i +
+        "' data-f='expected_qty' value='" +
+        t.expected_qty +
+        "' /></td></tr>";
+    });
+    body.innerHTML = html;
+    body.querySelectorAll("input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        clearBaselineMode();
+        const i = Number(inp.dataset.ti);
+        const f = inp.dataset.f;
+        let v = inp.value;
+        if (f === "price" || f === "max" || f === "expected_qty") {
+          v = v === "" ? (f === "max" ? null : 0) : Number(v);
+        }
+        tierRows[i][f] = v;
+        if (f !== "name" && f !== "sales_start" && f !== "sales_end") {
+          tierRows[i].source = "odoo-tier";
+        }
+        recalculate();
+      });
+    });
+    const trev =
+      form && form.options && form.options.tiers
+        ? form.options.tiers
+        : TicketTiers.computeTierRevenue(tierRows, {
+            enabled: true,
+            N: form.options.N,
+            camp_separate: $("#campSeparate") && $("#campSeparate").checked,
+            camp_fee: form.options.camp_fee,
+            p_camp: form.options.p_camp,
+          });
+    if ($("#tiersLiveK22")) {
+      $("#tiersLiveK22").textContent =
+        "Live K22 (tiers): " +
+        fmtMoney2(r.K22) +
+        " · " +
+        (trev.reconstruction_note || "");
+    }
+    if ($("#tiersError")) {
+      if (trev.error) {
+        $("#tiersError").hidden = false;
+        $("#tiersError").textContent = trev.error;
+      } else {
+        $("#tiersError").hidden = true;
+      }
+    }
+  }
+
+  function renderSponsorsPanel(r) {
+    const enabled = $("#sponsorsEnabled") && $("#sponsorsEnabled").checked;
+    const panel = $("#sponsorsPanel");
+    if (!panel) return;
+    panel.hidden = !enabled;
+    if (!enabled) return;
+    const sBox = $("#sponsorsList");
+    let sh = "";
+    sponsorRows.forEach(function (s, i) {
+      sh +=
+        "<div class='grid-2' style='margin-bottom:0.35rem'>" +
+        "<input type='text' placeholder='Name' data-si='" +
+        i +
+        "' data-f='name' value='" +
+        escapeHtml(s.name || "") +
+        "' />" +
+        "<input type='text' placeholder='Level' data-si='" +
+        i +
+        "' data-f='level' value='" +
+        escapeHtml(s.level || "") +
+        "' />" +
+        "<input type='number' placeholder='Count' data-si='" +
+        i +
+        "' data-f='count' value='" +
+        (s.count != null ? s.count : 1) +
+        "' />" +
+        "<input type='number' placeholder='Fee $' data-si='" +
+        i +
+        "' data-f='fee' value='" +
+        (s.fee != null ? s.fee : 0) +
+        "' />" +
+        "</div>";
+    });
+    sBox.innerHTML = sh || "<p class='footer-note' style='text-align:left'>No sponsors yet.</p>";
+    const bBox = $("#boothsList");
+    let bh = "";
+    boothRows.forEach(function (b, i) {
+      bh +=
+        "<div class='grid-2' style='margin-bottom:0.35rem'>" +
+        "<input type='text' placeholder='Category' data-bi='" +
+        i +
+        "' data-f='category' value='" +
+        escapeHtml(b.category || "") +
+        "' />" +
+        "<input type='number' placeholder='Count' data-bi='" +
+        i +
+        "' data-f='count' value='" +
+        (b.count != null ? b.count : 1) +
+        "' />" +
+        "<input type='number' placeholder='Price $' data-bi='" +
+        i +
+        "' data-f='price' value='" +
+        (b.price != null ? b.price : 0) +
+        "' />" +
+        "</div>";
+    });
+    bBox.innerHTML = bh || "<p class='footer-note' style='text-align:left'>No booths yet.</p>";
+    sBox.querySelectorAll("input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        clearBaselineMode();
+        const i = Number(inp.dataset.si);
+        const f = inp.dataset.f;
+        let v = inp.value;
+        if (f === "count" || f === "fee") v = Number(v) || 0;
+        sponsorRows[i][f] = v;
+        recalculate();
+      });
+    });
+    bBox.querySelectorAll("input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        clearBaselineMode();
+        const i = Number(inp.dataset.bi);
+        const f = inp.dataset.f;
+        let v = inp.value;
+        if (f === "count" || f === "price") v = Number(v) || 0;
+        boothRows[i][f] = v;
+        recalculate();
+      });
+    });
+    if ($("#sponsorsSummary") && r.sponsors_booths) {
+      $("#sponsorsSummary").textContent =
+        "Income " +
+        fmtMoney2(r.sponsors_booths_income || 0) +
+        " · site cost " +
+        fmtMoney2(r.sponsors_booths_site_cost || 0) +
+        " (outside G3)";
+    }
+  }
+
+  function odooExportOpts(form) {
+    return {
+      tiers: form.options.tiers && form.options.tiers.rows,
+      sponsors: sponsorRows,
+      booths: boothRows,
+      limit_registrations: form.profile.limit_registrations,
+      timezone: form.profile.timezone,
+      venue: form.profile.venue,
+      organizer: form.profile.organizer,
+      visibility: "public",
+      tags: [form.profile.type, form.profile.subtype].filter(Boolean).join("|"),
+    };
+  }
+
   function recalculate() {
     if (!model) return;
     const form = readForm();
@@ -454,10 +899,17 @@
       options.safetyWeather.qtyOverrides = window.__swQtyOverrides;
     }
     // ===== END Safety / Weather compute wiring =====
+    options.sponsorsBooths = form.options.sponsorsBooths;
+    options.ticketBuild = form.options.ticketBuild;
+    options.limit_registrations = form.options.limit_registrations;
+    options.tiers = form.options.tiers;
     const r = BudgetEngine.compute(model, options);
     renderRfidPanel(r);
     renderSafetyWeatherPanel(r);
+    renderTiersPanel(r, form);
+    renderSponsorsPanel(r);
     renderPnL(r);
+    renderAssumptionLedger(r, form);
     renderCompetitors(profile, r);
   }
 
@@ -672,7 +1124,7 @@
             (where ? " · " + escapeHtml(where) : "") +
             "</span><span>score " +
             m.score +
-            (m.stale ? " <span class='badge'>directory match, dates may be stale</span>" : "") +
+            (m.stale ? " <span class='badge'>month-day; listing year may be stale</span>" : "") +
             "</span></div><div class='reasons'>" +
             escapeHtml(m.reasons.join(" · ") || "—") +
             "</div></div>"
@@ -716,7 +1168,7 @@
     });
     html += "</tbody></table>";
     box.innerHTML = html;
-    showPanel("reconcile");
+    goAxStep(6);
   }
 
   function renderMcNumbers(result) {
@@ -778,9 +1230,18 @@
       return;
     }
     const form = readForm();
+    if (form.options.tiers && form.options.tiers.enabled && form.options.tiers.error) {
+      flash(form.options.tiers.error, "warn");
+      $("#mcStatus").textContent = "Tier qty sum ≠ N — fix tiers before MC.";
+      return;
+    }
     const options = form.options;
     options.rfid = form.rfid;
     options.safetyWeather = form.safetyWeather;
+    options.sponsorsBooths = form.options.sponsorsBooths;
+    options.ticketBuild = form.options.ticketBuild;
+    options.limit_registrations = form.options.limit_registrations;
+    options.tiers = form.options.tiers;
     options.profile = form.profile;
     options.state = form.profile.state;
     options.city = form.profile.city;
@@ -794,7 +1255,7 @@
       $("#mcStatus").textContent = "Numbers ready — animating P50 journey draw…";
       // STEP D: numbers FIRST (visible without watching animation)
       renderMcNumbers(result);
-      showPanel("montecarlo");
+      goAxStep(5);
       // STEP B/C: animate one representative draw (default P50)
       startJourneyPresentation(result, "P50");
     }, 30);
@@ -810,8 +1271,122 @@
   }
 
   function wire() {
+    $$(".ax-step").forEach(function (b) {
+      b.addEventListener("click", function () {
+        goAxStep(b.dataset.step);
+      });
+    });
+    $$("[data-goto]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        goAxStep(b.dataset.goto);
+      });
+    });
+    if ($("#btnResetSheet")) $("#btnResetSheet").addEventListener("click", resetToSheet);
+    if ($("#btnResetSheet2")) $("#btnResetSheet2").addEventListener("click", resetToSheet);
+
+    if ($("#limitRegEnabled")) {
+      $("#limitRegEnabled").addEventListener("change", function () {
+        clearBaselineMode();
+        if ($("#limitRegWrap")) $("#limitRegWrap").hidden = !$("#limitRegEnabled").checked;
+        recalculate();
+      });
+    }
+    if ($("#limitRegistrations")) {
+      $("#limitRegistrations").addEventListener("change", function () {
+        clearBaselineMode();
+        recalculate();
+      });
+    }
+
+    if ($("#tiersEnabled")) {
+      $("#tiersEnabled").addEventListener("change", function () {
+        clearBaselineMode();
+        if ($("#tiersEnabled").checked && (!tierRows.length) && model) {
+          tierRows = TicketTiers.defaultTiersFromSheet(
+            model.defaults,
+            Number($("#attendance").value) || model.baseline.N0
+          );
+        }
+        recalculate();
+      });
+    }
+    if ($("#campSeparate")) {
+      $("#campSeparate").addEventListener("change", function () {
+        clearBaselineMode();
+        recalculate();
+      });
+    }
+    if ($("#btnAddTier")) {
+      $("#btnAddTier").addEventListener("click", function () {
+        clearBaselineMode();
+        tierRows.push({
+          id: "tier_" + Date.now(),
+          name: "VIP",
+          price: 399,
+          max: 100,
+          sales_start: "",
+          sales_end: "",
+          expected_qty: 0,
+          source: "odoo-tier",
+        });
+        if ($("#tiersEnabled")) $("#tiersEnabled").checked = true;
+        recalculate();
+      });
+    }
+    if ($("#btnResetTiers")) {
+      $("#btnResetTiers").addEventListener("click", function () {
+        clearBaselineMode();
+        const N = Number($("#attendance").value) || model.baseline.N0;
+        // Rebuild defaults using current K7/K6/K8 from form
+        const defs = Object.assign({}, model.defaults, {
+          ticket: Number($("#ticketPrice").value),
+          camp_fee: Number($("#campFee").value),
+          p_camp: Number($("#pCamp").value) / 100,
+        });
+        tierRows = TicketTiers.defaultTiersFromSheet(defs, N);
+        recalculate();
+      });
+    }
+
+    if ($("#sponsorsEnabled")) {
+      $("#sponsorsEnabled").addEventListener("change", function () {
+        clearBaselineMode();
+        recalculate();
+      });
+    }
+    if ($("#btnAddSponsor")) {
+      $("#btnAddSponsor").addEventListener("click", function () {
+        clearBaselineMode();
+        sponsorRows.push({
+          name: "Sponsor",
+          level: "Gold",
+          type: "cash",
+          count: 1,
+          fee: 5000,
+          show_on_ticket: true,
+        });
+        if ($("#sponsorsEnabled")) $("#sponsorsEnabled").checked = true;
+        recalculate();
+      });
+    }
+    if ($("#btnAddBooth")) {
+      $("#btnAddBooth").addEventListener("click", function () {
+        clearBaselineMode();
+        boothRows.push({ category: "Craft", count: 10, price: 250, creates_sponsor: false });
+        if ($("#sponsorsEnabled")) $("#sponsorsEnabled").checked = true;
+        recalculate();
+      });
+    }
+    if ($("#sponsorSiteCost")) {
+      $("#sponsorSiteCost").addEventListener("change", function () {
+        clearBaselineMode();
+        recalculate();
+      });
+    }
+
     $("#marketingPct").addEventListener("input", (e) => {
       $("#marketingPctLabel").textContent = e.target.value + "%";
+      clearBaselineMode();
     });
 
     [
@@ -835,14 +1410,22 @@
       "endDate",
     ].forEach((id) => {
       const el = $("#" + id);
-      if (el) el.addEventListener("change", recalculate);
+      if (el)
+        el.addEventListener("change", function () {
+          clearBaselineMode();
+          recalculate();
+        });
       if (el && (el.type === "number" || el.type === "range"))
         el.addEventListener("input", () => {
-          if (id === "marketingPct") return; // label only until change debounce — still recalc
+          if (id === "marketingPct") return;
+          clearBaselineMode();
           recalculate();
         });
     });
-    $("#marketingPct").addEventListener("change", recalculate);
+    $("#marketingPct").addEventListener("change", function () {
+      clearBaselineMode();
+      recalculate();
+    });
 
     if ($("#campingOn")) {
       $("#campingOn").addEventListener("change", function () {
@@ -855,6 +1438,7 @@
     }
     if ($("#rfidEnabled")) {
       $("#rfidEnabled").addEventListener("change", function () {
+        clearBaselineMode();
         if (!$("#rfidEnabled").checked) {
           window.__rfidQtyOverrides = {};
         }
@@ -868,6 +1452,7 @@
     // ===== BEGIN Safety / Weather listeners =====
     if ($("#safetyWeatherEnabled")) {
       $("#safetyWeatherEnabled").addEventListener("change", function () {
+        clearBaselineMode();
         if (!$("#safetyWeatherEnabled").checked) {
           window.__swQtyOverrides = {};
         }
@@ -953,14 +1538,22 @@
         talent_cap: form.profile.talent_cap,
         show_days: form.profile.show_days,
         talent_names: form.profile.talent_names,
+        limit_registrations: form.profile.limit_registrations,
       });
       if (!window.XLSX) {
         flash("SheetJS failed to load — check network / CDN.", "warn");
         return;
       }
-      Templates.downloadAll(profile);
-      flash("Downloading blank .xlsx pack (sequential)…", "info");
+      Templates.downloadAll(profile, odooExportOpts(form));
+      flash("Downloading blank .xlsx pack + odoo_event_import.csv…", "info");
     });
+    if ($("#btnOdooCsv")) {
+      $("#btnOdooCsv").addEventListener("click", function () {
+        const form = readForm();
+        Templates.downloadOdooCsv(form.profile, odooExportOpts(form));
+        flash("Downloading odoo_event_import.csv…", "info");
+      });
+    }
 
     $$(".tabs button").forEach((b) => {
       b.addEventListener("click", () => showPanel(b.dataset.panel));
@@ -975,11 +1568,11 @@
       return;
     }
     applyDefaultsToForm();
-    // Baseline UI should match sheet without music-focus multiplier for reconcile demos;
-    // product default: music focus on. User can reconcile with button (engine ignores wizard).
+    ensureSheetBaseline();
+    // Product default: music focus on (changes live vs sheet). Use Reset / Reconcile for raw sheet.
     wire();
+    goAxStep(1);
     recalculate();
-    showPanel("pnl");
     flash(
       "Loaded Master Budget (N0=" +
         model.baseline.N0 +

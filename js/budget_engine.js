@@ -355,8 +355,49 @@
       };
     }
     const safety_weather_subtotal = swEnabled ? num(swEstimate.subtotal, 0) : 0;
-    // Live total opex = Master Budget G3 + optional RFID + optional Safety/Weather
-    const total_opex = G3_master + rfid_subtotal + safety_weather_subtotal;
+
+    // Optional Sponsors / Booths — income + optional site cost (outside Master G3)
+    const sbOpts = options.sponsorsBooths || options.sponsors_booths || {};
+    const sbEnabled = !!sbOpts.enabled;
+    let sbEstimate = {
+      enabled: false,
+      income: 0,
+      site_cost: 0,
+      sponsor_income: 0,
+      booth_income: 0,
+      lines: [],
+      bucket_label: "Sponsors / Booths (optional)",
+    };
+    if (
+      sbEnabled &&
+      typeof global.SponsorsBooths !== "undefined" &&
+      global.SponsorsBooths &&
+      typeof global.SponsorsBooths.computeSponsorsBooths === "function"
+    ) {
+      sbEstimate = global.SponsorsBooths.computeSponsorsBooths({
+        enabled: true,
+        sponsors: sbOpts.sponsors || [],
+        booths: sbOpts.booths || [],
+        site_cost: sbOpts.site_cost,
+      });
+    } else if (sbEnabled) {
+      sbEstimate = {
+        enabled: true,
+        income: 0,
+        site_cost: num(sbOpts.site_cost, 0),
+        sponsor_income: 0,
+        booth_income: 0,
+        lines: [],
+        bucket_label: "Sponsors / Booths (optional)",
+        warning: "SponsorsBooths not loaded",
+      };
+    }
+    const sponsors_booths_income = sbEnabled ? num(sbEstimate.income, 0) : 0;
+    const sponsors_booths_site_cost = sbEnabled ? num(sbEstimate.site_cost, 0) : 0;
+
+    // Live total opex = Master Budget G3 + optional RFID + Safety/Weather + sponsor site cost
+    const total_opex =
+      G3_master + rfid_subtotal + safety_weather_subtotal + sponsors_booths_site_cost;
 
     // Ancillaries: default scale amount*(N/N0); user-overridable
     const ancOverrides = options.ancillaryOverrides || {};
@@ -383,10 +424,10 @@
       (model.addbacks.find((x) => x.id === "owner_salary_addback") || {}).amount || 0
     );
 
-    // K24 = R - opex; K30 = K24 + kickback + owner; K47 = K24 + anc + kickback + owner
+    // K24 = R - opex; K30 = K24 + kickback + owner; K47 = K24 + anc + kickback + owner + sponsor/booth income
     const K24 = R - total_opex;
     const K30 = K24 + kickback + owner;
-    const K47 = K24 + ancTotal + kickback + owner;
+    const K47 = K24 + ancTotal + kickback + owner + sponsors_booths_income;
 
     return {
       N,
@@ -425,6 +466,10 @@
       safety_weather: swEstimate,
       safety_weather_subtotal: safety_weather_subtotal,
       safety_weather_enabled: swEnabled,
+      sponsors_booths: sbEstimate,
+      sponsors_booths_income: sponsors_booths_income,
+      sponsors_booths_site_cost: sponsors_booths_site_cost,
+      sponsors_booths_enabled: sbEnabled,
       ancillaries: ancLines,
       ancTotal,
       kickback,
@@ -480,6 +525,7 @@
       wizard: {},
       rfid: { enabled: false },
       safetyWeather: { enabled: false },
+      sponsorsBooths: { enabled: false },
     });
     const targets = model.sheet_targets_at_N0;
     const rows = [

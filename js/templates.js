@@ -800,6 +800,94 @@
     });
   }
 
+  /* ---------- Odoo event import CSV (no website/POS/mailer) ---------- */
+
+  function csvEscape(v) {
+    var s = v == null ? "" : String(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function rowsToCsv(rows) {
+    return rows
+      .map(function (r) {
+        return r.map(csvEscape).join(",");
+      })
+      .join("\n");
+  }
+
+  /**
+   * buildOdooEventImportCsv(profile, opts)
+   * opts: { tiers, sponsors, booths, limit_registrations, timezone, venue, organizer, tags, visibility }
+   * Labels: Event / Ticket / Sponsor / Booth sections.
+   */
+  function buildOdooEventImportCsv(profile, opts) {
+    opts = opts || {};
+    var p = profile || {};
+    var rows = [];
+    rows.push(["section", "field", "value"]);
+    rows.push(["Event", "name", p.name || ""]);
+    rows.push(["Event", "date", p.start_date || p.start || ""]);
+    rows.push(["Event", "timezone", opts.timezone || p.timezone || "UTC"]);
+    rows.push(["Event", "venue", opts.venue || p.venue || [p.city, p.state].filter(Boolean).join(", ")]);
+    rows.push(["Event", "organizer", opts.organizer || p.organizer || ""]);
+    rows.push(["Event", "tags", opts.tags || [p.type, p.subtype].filter(Boolean).join("|")]);
+    rows.push(["Event", "visibility", opts.visibility || p.visibility || "public"]);
+    var lim =
+      opts.limit_registrations != null
+        ? opts.limit_registrations
+        : p.limit_registrations != null
+          ? p.limit_registrations
+          : "";
+    rows.push(["Event", "limit_registrations", lim === "" || lim == null ? "" : String(lim)]);
+
+    var tiers = (opts.tiers && (opts.tiers.rows || opts.tiers.tiers || opts.tiers)) || [];
+    if (!Array.isArray(tiers)) tiers = [];
+    tiers.forEach(function (t, i) {
+      var prefix = "Ticket";
+      rows.push([prefix, "name", t.name || "Tier " + (i + 1)]);
+      rows.push([prefix, "price", t.price != null ? t.price : ""]);
+      rows.push([prefix, "sales_start", t.sales_start || ""]);
+      rows.push([prefix, "sales_end", t.sales_end || ""]);
+      rows.push([prefix, "maximum", t.max != null ? t.max : ""]);
+    });
+
+    var sponsors = (opts.sponsors || []);
+    if (!Array.isArray(sponsors)) sponsors = [];
+    sponsors.forEach(function (s) {
+      rows.push(["Sponsor", "name", s.name || ""]);
+      rows.push(["Sponsor", "level", s.level || ""]);
+      rows.push(["Sponsor", "type", s.type || "cash"]);
+      rows.push(["Sponsor", "show_on_ticket", s.show_on_ticket ? "1" : "0"]);
+      rows.push(["Sponsor", "fee", s.fee != null ? s.fee : ""]);
+    });
+
+    var booths = opts.booths || [];
+    if (!Array.isArray(booths)) booths = [];
+    booths.forEach(function (b) {
+      rows.push(["Booth", "category", b.category || ""]);
+      rows.push(["Booth", "count", b.count != null ? b.count : ""]);
+      rows.push(["Booth", "price", b.price != null ? b.price : ""]);
+      rows.push(["Booth", "creates_sponsor", b.creates_sponsor ? "1" : "0"]);
+    });
+
+    return rowsToCsv(rows);
+  }
+
+  function downloadOdooCsv(profile, opts) {
+    var csv = buildOdooEventImportCsv(profile, opts);
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = safeName(profile) + "_odoo_event_import.csv";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 500);
+  }
+
   /* ---------- pack download ---------- */
 
   function safeName(profile) {
@@ -828,7 +916,7 @@
     downloadArrayBuffer(filename, buf);
   }
 
-  function downloadAll(profile) {
+  function downloadAll(profile, opts) {
     var p = profile || {};
     var prefix = safeName(p);
     var list = allWorkbooks(p);
@@ -843,6 +931,16 @@
         }
       }, i * 350);
     });
+    // NEW: odoo_event_import.csv after xlsx pack
+    setTimeout(function () {
+      try {
+        downloadOdooCsv(p, opts || p.odoo_export || {});
+      } catch (err) {
+        if (typeof console !== "undefined" && console.error) {
+          console.error("Odoo CSV download failed:", err);
+        }
+      }
+    }, list.length * 350 + 100);
   }
 
   // Node / test helpers (no DOM download)
@@ -874,5 +972,7 @@
     downloadAll: downloadAll,
     buildAllBuffers: buildAllBuffers,
     rfidUnitPriceCatalog: rfidUnitPriceCatalog,
+    buildOdooEventImportCsv: buildOdooEventImportCsv,
+    downloadOdooCsv: downloadOdooCsv,
   };
 })(typeof window !== "undefined" ? window : global);
