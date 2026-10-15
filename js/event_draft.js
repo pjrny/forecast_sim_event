@@ -185,6 +185,13 @@
     return safeRequire("../docs/event-draft.v1.schema.json") || (safeRequire("./event_draft_schema.js") || {}).schema || null;
   }
 
+  /** Field key a local error refers to: "venue.name required" → "venue.name"; "lineup[0] times…" → "lineup[0]". */
+  function fieldOf(e) {
+    var tok = String(e).split(" ")[0];
+    if (tok === "start" && /before end/.test(e)) return "end";
+    return tok;
+  }
+
   function validateEventDraft(d) {
     var errors = [];
     if (!d || typeof d !== "object") return { ok: false, errors: ["draft missing"] };
@@ -214,7 +221,16 @@
     var schema = global.EVENT_DRAFT_SCHEMA || loadSchema();
     var Lite = global.SchemaLite || safeRequire("./schema_lite.js");
     if (schema && Lite) {
-      Lite.validate(schema, d).forEach(function (e) { errors.push("schema " + e); });
+      // Dedupe: hide schema messages for fields our local checks already flagged.
+      var flagged = {};
+      errors.forEach(function (e) { flagged[fieldOf(e)] = 1; });
+      Lite.validate(schema, d).forEach(function (e) {
+        var m = /^\$\.?([^:]*):/.exec(e);
+        var f = m ? m[1] : "";
+        var top = f.replace(/\[\d+\].*$/, "").split(".")[0];
+        if (flagged[f] || flagged[f.replace(/\[\d+\]$/, "")] || flagged[top + "*"]) return;
+        errors.push("schema " + e);
+      });
     } else {
       errors.push("canonical schema not loaded");
     }

@@ -108,6 +108,15 @@ const outside = EventDraft.validateEventDraft(Object.assign({}, d, { lineup: [{ 
 assert(!outside.ok && outside.errors.some((e) => /inside event/.test(e)), "set outside event window rejected");
 assert(!("publish" in d), "draft never carries publish");
 
+const empty = EventDraft.validateEventDraft(EventDraft.buildEventDraft({ profile: { N: N0 }, ga_price: 199, ros: { confirmed: false } }));
+const fieldsOf = (errs) => errs.map((e) => { const m = /^schema \$\.?([^:]*):/.exec(e); return m ? m[1] : e.split(" ")[0]; });
+const ef = fieldsOf(empty.errors);
+const dups = ef.filter((f, i) => ef.indexOf(f) !== i);
+assert(!empty.ok && dups.length === 0, "empty-form missing list has no duplicate fields (" + empty.errors.length + " msgs) " + JSON.stringify(dups));
+assert(!empty.errors.some((e) => /^schema \$\.(start|end|venue\.name):/.test(e)), "schema msgs for start/end/venue.name hidden when local checks flagged them");
+const schemaOnly = EventDraft.validateEventDraft(Object.assign({}, d, { tags: ["cashless:hybrid"] }));
+assert(schemaOnly.errors.some((e) => /^schema \$\.tags\[0\]/.test(e)), "schema-only errors still shown");
+
 console.log("=== 7) Forecast D1-only ===");
 assert(d.forecast._storage === "d1_only" && d.forecast.p50 === mc.P50 && d.forecast.p_profit === mc.pProfit && Math.abs(d.forecast.break_even_ticket - T.K2) <= 0.01, "forecast p10/p50/p90/p_profit/break_even present, d1_only");
 assert(!("forecast" in EventDraft.odooFields(d)), "odooFields strips forecast");
