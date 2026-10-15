@@ -64,6 +64,22 @@
     return null;
   }
 
+  // Labels produced by RosGate.generateSkeleton — never treated as act names.
+  var PLACEHOLDER_RE = /^(first|last) set day \d+$|^(doors|peak attendance window)\b.*day \d+$|^(set|act|headliner|performance|first_set|last_set)$/i;
+
+  function isPlaceholderName(s) {
+    return !s || PLACEHOLDER_RE.test(s);
+  }
+
+  /** Only names the organizer typed; auto-generated slot labels → ''. */
+  function actName(r) {
+    var a = str(r.artist);
+    if (a && !isPlaceholderName(a)) return a;
+    if (r.generated === true) return "";
+    var n = str(r.note);
+    return isPlaceholderName(n) ? "" : n;
+  }
+
   function isActRow(r) {
     if (!r) return false;
     if (str(r.kind).toLowerCase() === "act") return true;
@@ -79,7 +95,7 @@
       var start = isoLocal(date, r.time);
       var end = r.end_time ? isoLocal(date, r.end_time) : addMinutes(start, Number(r.duration_min) || DEFAULT_SET_MINUTES);
       return {
-        name: str(r.artist) || str(r.note) || str(r.action),
+        name: actName(r),
         start: start,
         end: end,
         stage: str(r.stage) || str(r.area) || "Main",
@@ -172,7 +188,7 @@
       if (Number(t.price) !== 0) errors.push("tickets[" + i + "].price must be 0 (pay at door)");
     });
     (d.lineup || []).forEach(function (a, i) {
-      if (!str(a.name)) errors.push("lineup[" + i + "].name required");
+      if (a.name == null || typeof a.name !== "string") errors.push("lineup[" + i + "].name must be a string ('' = unnamed slot)");
       if (!re.test(a.start || "") || !re.test(a.end || "")) errors.push("lineup[" + i + "] times invalid");
     });
     return { ok: errors.length === 0, errors: errors };
@@ -186,7 +202,7 @@
   }
 
   var api = { VERSION: VERSION, buildEventDraft: buildEventDraft, validateEventDraft: validateEventDraft,
-    odooFields: odooFields, isActRow: isActRow, _isoLocal: isoLocal };
+    odooFields: odooFields, isActRow: isActRow, isPlaceholderName: isPlaceholderName, _isoLocal: isoLocal };
   global.EventDraft = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

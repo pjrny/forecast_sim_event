@@ -34,7 +34,7 @@
       "type": "array",
       "items": {
         "type": "object", "required": ["name", "start", "end"],
-        "properties": { "name": { "type": "string" }, "start": { "type": "string" }, "end": { "type": "string" }, "stage": { "type": "string" } }
+        "properties": { "name": { "type": "string", "description": "Organizer-typed act name; '' for auto-generated ROS slots" }, "start": { "type": "string" }, "end": { "type": "string" }, "stage": { "type": "string" } }
       },
       "x-odoo": "event.track (act rows of confirmed ROS only)"
     },

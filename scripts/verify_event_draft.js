@@ -4,7 +4,7 @@
  * 1) Default N=7888 draft (engine + skeleton ROS + MC) validates; Master Budget K22/G3 unchanged
  * 2) GA ticket name "GA – Pay at Door $199", price 0, max = capacity
  * 3) VIP omitted when absent; included (price 0, price in name) when tiers have VIP
- * 4) Lineup = act rows of confirmed ROS only; empty when ROS unconfirmed
+ * 4) Lineup = act rows of confirmed ROS only; generated slot names → ''; typed names kept
  * 5) Capacity uses Limit Registrations when set
  * 6) validateEventDraft rejects missing venue / start>=end / capacity 0
  * 7) Forecast block marked d1_only and stripped by odooFields
@@ -67,7 +67,11 @@ assert(dv.tickets.length === 2 && dv.tickets[1].name === "VIP – Pay at Door $3
 console.log("=== 4) Lineup ===");
 const actCount = sk.rows.filter((r) => ["first_set", "last_set"].includes(r.action)).length;
 assert(d.lineup.length === actCount && actCount > 0, "lineup has only act rows (" + d.lineup.length + "/" + sk.rows.length + " ROS rows)");
-assert(d.lineup.every((a) => !/gates|egress|doors|peak|camp|will_call/i.test(a.name)), "no non-act rows (gates/doors/peak/egress/camp) in lineup");
+assert(d.lineup.every((a) => a.name === ""), "auto-generated slots export name '' (no 'First set Day 1' placeholders)");
+assert(d.lineup.every((a) => a.stage && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(a.start) && a.end > a.start), "unnamed slots keep start/end/stage");
+const typed = sk.rows.map((r) => (r.action === "first_set" && r.day === 1 ? Object.assign({}, r, { note: "DJ Sunrise" }) : r));
+const dt = EventDraft.buildEventDraft(Object.assign({}, state, { ros: { confirmed: true, rows: typed } }));
+assert(dt.lineup.filter((a) => a.name === "DJ Sunrise").length === 1 && dt.lineup.filter((a) => a.name === "").length === actCount - 1, "organizer-typed name kept; other slots stay ''");
 assert(d.lineup[0].start === "2026-11-13T12:00" && d.lineup[0].end === "2026-11-13T13:00", "act start/end on correct show day");
 const withArtist = EventDraft.buildEventDraft(Object.assign({}, state, { ros: { confirmed: true, rows: sk.rows.concat([{ day: 2, time: "21:00", end_time: "22:30", artist: "Headliner X", area: "Main Stage", action: "set" }]) } }));
 assert(withArtist.lineup.some((a) => a.name === "Headliner X" && a.stage === "Main Stage" && a.end === "2026-11-14T22:30"), "artist row → name/stage/end");

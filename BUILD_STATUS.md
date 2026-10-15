@@ -83,7 +83,7 @@ Branch `v1.4-event-draft` (based on local `v1.3-accuracy-ux` tip b2ee6f6).
 ## Gaps
 - `docs/event-draft.v1.local.json` is a placeholder until the organizer repo publishes the canonical schema.
 - Real Worker endpoints aren't live yet, so the flow has only been tested against `scripts/mock_worker.js`.
-- Skeleton ROS act rows are generic ("First set Day 1"). Artist names only appear if the organizer edits them in.
+- Auto-generated ROS act slots export `name: ''` (times/stage kept). Only organizer-typed names are sent, so the Worker must accept or label unnamed tracks.
 - Festival directory → D1 and R2-backed generation are on the Worker side and not part of this repo.
 
 ## Paths (v1.4)

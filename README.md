@@ -63,7 +63,7 @@ At the end of the flow (step 7) there are two buttons:
 | `capacity` | Limit Registrations if set, else N | `seats_max` |
 | `tags` | type, subtype, genre, camping, cashless mode | `tag_ids` |
 | `tickets` | `GA – Pay at Door $<GA price>` price 0, max = capacity; `VIP – Pay at Door $<price>` only if a VIP tier exists | event tickets ($0) |
-| `lineup[{name,start,end,stage}]` | **act rows only** of the confirmed ROS (`first_set`/`last_set`/`set`/`act`/`headliner`, `kind:"act"` or `artist`) | tracks |
+| `lineup[{name,start,end,stage}]` | **act rows only** of the confirmed ROS (`first_set`/`last_set`/`set`/`act`/`headliner`, `kind:"act"` or `artist`) | tracks (`name` is `''` for auto-generated slots like "First set Day 1"; only organizer-typed names are sent) |
 | `forecast{p10,p50,p90,p_profit,break_even_ticket,pnl_by_dept,assumption_ledger}` | MC + engine + ledger | **D1 only, never Odoo** (`odooFields()` strips it) |
 
 Placeholder schema: `docs/event-draft.v1.local.json`, to be replaced by the organizer repo's canonical `event-draft.v1.json`.
