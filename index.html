@@ -55,17 +55,24 @@
             <label>End <input type="date" id="endDate" /></label>
           </div>
           <div class="grid-2">
-            <label>City <input type="text" id="city" /></label>
-            <label>State <input type="text" id="state" maxlength="2" placeholder="ST" /></label>
+            <label>Start time <input type="time" id="startTime" value="12:00" /></label>
+            <label>End time <input type="time" id="endTime" value="23:00" /></label>
+          </div>
+          <label>Venue name <input type="text" id="venue" placeholder="Venue / grounds" autocomplete="organization" /></label>
+          <label>Street address <input type="text" id="venueStreet" placeholder="100 Festival Rd" autocomplete="street-address" /></label>
+          <div class="grid-2">
+            <label>City <input type="text" id="city" autocomplete="address-level2" /></label>
+            <label>State <input type="text" id="state" maxlength="2" placeholder="ST" autocomplete="address-level1" /></label>
+          </div>
+          <div class="grid-2">
+            <label>ZIP <input type="text" id="venueZip" inputmode="numeric" maxlength="10" placeholder="77002" autocomplete="postal-code" /></label>
+            <label>Timezone <select id="timezone"><option value="America/Chicago">America/Chicago</option><option value="America/New_York">America/New_York</option><option value="America/Denver">America/Denver</option><option value="America/Phoenix">America/Phoenix</option><option value="America/Los_Angeles">America/Los_Angeles</option><option value="America/Anchorage">America/Anchorage</option><option value="Pacific/Honolulu">Pacific/Honolulu</option><option value="America/Puerto_Rico">America/Puerto_Rico</option><option value="America/Toronto">America/Toronto</option><option value="America/Vancouver">America/Vancouver</option><option value="America/Mexico_City">America/Mexico_City</option><option value="Europe/London">Europe/London</option><option value="Europe/Berlin">Europe/Berlin</option><option value="Europe/Amsterdam">Europe/Amsterdam</option><option value="Europe/Madrid">Europe/Madrid</option><option value="Australia/Sydney">Australia/Sydney</option><option value="Asia/Tokyo">Asia/Tokyo</option><option value="UTC">UTC</option></select></label>
           </div>
           <div class="grid-2">
             <label>Type <input type="text" id="festType" placeholder="Music" /></label>
             <label>Subtype <input type="text" id="festSubtype" placeholder="Camping" /></label>
           </div>
-          <div class="grid-2">
-            <label>Timezone <input type="text" id="timezone" placeholder="America/Chicago" /></label>
-            <label>Venue <input type="text" id="venue" placeholder="Venue / grounds" /></label>
-          </div>
+          <label>Genre <input type="text" id="festGenre" placeholder="EDM / House / Bass" /></label>
           <label>Organizer <input type="text" id="organizer" placeholder="Organizer" /></label>
         </div>
         <label>Attendance N <span class="cell-ref" title="K1">K1 · sheet</span>
@@ -428,6 +435,17 @@
           <li>Sponsor: name, level, type, show_on_ticket, fee</li>
           <li>Booth: category, count, price, creates_sponsor</li>
         </ul>
+
+        <div class="create-event" id="createEventBox" style="margin-top:0.75rem;border-top:1px solid var(--line, #333);padding-top:0.75rem">
+          <h3 style="margin:0 0 0.4rem">Create this event</h3>
+          <p class="footer-note" style="text-align:left;padding:0 0 0.4rem">Free ticketed event on Patron Journey: GA (and VIP if set) as <em>Pay at Door</em> tickets with your price in the name. Forecast numbers stay private (D1), never in Odoo.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:0.4rem">
+            <button type="button" id="btnCreateFree" class="primary" disabled>Create free event (pay at door)</button>
+            <a id="btnCreatePaid" class="ghost button" href="https://www.pjrny.com/#Contact-us" target="_blank" rel="noopener">Create paid event</a>
+          </div>
+          <ul id="createEventIssues" class="footer-note" style="text-align:left;color:var(--muted);font-size:0.8rem;margin:0.4rem 0 0"></ul>
+          <p id="createEventStatus" class="footer-note" style="text-align:left" aria-live="polite"></p>
+        </div>
         <div class="ax-nav">
           <button type="button" data-goto="6">← Competitors</button>
           <span></span>
@@ -437,7 +455,7 @@
   </div>
 
   <p class="footer-note">
-    Oscar Voigt / Patron Journey · Festival Forecaster v1.3 · localStorage drafts only · no login · engine from reconciled budget_model.json
+    Oscar Voigt / Patron Journey · Festival Forecaster v1.4 · autosaved locally · sign-in only to create the event · engine from reconciled budget_model.json
   </p>
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -452,10 +470,13 @@
   <script src="js/templates.js"></script>
   <script src="js/rfid_addon.js"></script>
   <script src="js/safety_weather.js"></script>
+  <script src="js/crowd_ban_filter.js"></script>
   <script src="js/crowd_bank.js"></script>
   <script src="js/ops_bank.js"></script>
   <script src="js/ros_gate.js"></script>
   <script src="js/mc_presentation.js"></script>
+  <script src="js/event_draft.js"></script>
+  <script src="js/create_event.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

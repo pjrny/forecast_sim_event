@@ -10,6 +10,8 @@
   let festivals = [];
   let lastPnL = null;
   let lastMC = null;
+  let lastBudget = null;
+  let lastLedgerRows = [];
   let rosGate = null;
   let mcPres = null;
   let currentAxStep = 1;
@@ -125,6 +127,11 @@
         N: N,
         timezone: $("#timezone") ? $("#timezone").value.trim() : "",
         venue: $("#venue") ? $("#venue").value.trim() : "",
+        start_time: $("#startTime") ? $("#startTime").value : "",
+        end_time: $("#endTime") ? $("#endTime").value : "",
+        street: $("#venueStreet") ? $("#venueStreet").value.trim() : "",
+        zip: $("#venueZip") ? $("#venueZip").value.trim() : "",
+        genre: $("#festGenre") ? $("#festGenre").value.trim() : "",
         organizer: $("#organizer") ? $("#organizer").value.trim() : "",
         limit_registrations: limitOn && limitVal > 0 ? limitVal : null,
       },
@@ -258,8 +265,13 @@
     if ($("#sponsorsEnabled")) $("#sponsorsEnabled").checked = false;
     if ($("#sponsorsPanel")) $("#sponsorsPanel").hidden = true;
     if ($("#sponsorSiteCost")) $("#sponsorSiteCost").value = 0;
-    if ($("#timezone")) $("#timezone").value = "";
+    if ($("#timezone")) $("#timezone").value = "America/Chicago";
     if ($("#venue")) $("#venue").value = "";
+    if ($("#venueStreet")) $("#venueStreet").value = "";
+    if ($("#venueZip")) $("#venueZip").value = "";
+    if ($("#festGenre")) $("#festGenre").value = "";
+    if ($("#startTime")) $("#startTime").value = "12:00";
+    if ($("#endTime")) $("#endTime").value = "23:00";
     if ($("#organizer")) $("#organizer").value = "";
     sponsorRows = [];
     boothRows = [];
@@ -298,6 +310,13 @@
       if (p.city != null) $("#city").value = p.city;
       if (p.state != null) $("#state").value = p.state;
       if (p.type != null) $("#festType").value = p.type;
+      if (p.timezone && $("#timezone")) $("#timezone").value = p.timezone;
+      if (p.venue != null && $("#venue")) $("#venue").value = p.venue;
+      if (p.street != null && $("#venueStreet")) $("#venueStreet").value = p.street;
+      if (p.zip != null && $("#venueZip")) $("#venueZip").value = p.zip;
+      if (p.genre != null && $("#festGenre")) $("#festGenre").value = p.genre;
+      if (p.start_time && $("#startTime")) $("#startTime").value = p.start_time;
+      if (p.end_time && $("#endTime")) $("#endTime").value = p.end_time;
       if (p.subtype != null) $("#festSubtype").value = p.subtype;
       if (o.N) $("#attendance").value = o.N;
       if (o.ticket) $("#ticketPrice").value = o.ticket;
@@ -627,6 +646,7 @@
     add("Limit Registrations", !!(form && form.options && form.options.limit_registrations), form && form.options && form.options.limit_registrations ? ("cap " + form.options.limit_registrations) : "", "wizard");
     add("Baseline mode (sheet)", baselineMode, "empty wizard; marketing slider ignored", "sheet");
 
+    lastLedgerRows = rows.slice();
     const dK22 = r.K22 - sheetBaseline.K22;
     const dG3 = (r.G3_master != null ? r.G3_master : r.G3) - sheetBaseline.G3;
     const dK24 = r.K24 - sheetBaseline.K24;
@@ -904,6 +924,7 @@
     options.limit_registrations = form.options.limit_registrations;
     options.tiers = form.options.tiers;
     const r = BudgetEngine.compute(model, options);
+    lastBudget = r;
     renderRfidPanel(r);
     renderSafetyWeatherPanel(r);
     renderTiersPanel(r, form);
@@ -911,6 +932,7 @@
     renderPnL(r);
     renderAssumptionLedger(r, form);
     renderCompetitors(profile, r);
+    if (typeof updateCreateButtons === "function") updateCreateButtons();
   }
 
   function renderRfidPanel(r) {
@@ -1252,6 +1274,7 @@
     setTimeout(() => {
       const result = MonteCarlo.run(model, options, { draws: 5000, preset: preset, seed: 42 });
       lastMC = result;
+      updateCreateButtons();
       $("#mcStatus").textContent = "Numbers ready — animating P50 journey draw…";
       // STEP D: numbers FIRST (visible without watching animation)
       renderMcNumbers(result);
@@ -1560,6 +1583,104 @@
     });
   }
 
+  // ===== BEGIN event-draft.v1 / Create this event =====
+  const AUTOSAVE_MS = 800;
+  let autosaveTimer = null;
+
+  function draftStateFromUi() {
+    const form = readForm();
+    const p = form.profile;
+    const ros = rosGate && rosGate.isConfirmed()
+      ? { confirmed: true, rows: rosGate.getConfirmedRos().rows }
+      : { confirmed: false, rows: [] };
+    return {
+      profile: {
+        name: p.name, start_date: p.start_date, end_date: p.end_date,
+        start_time: p.start_time, end_time: p.end_time, timezone: p.timezone,
+        venue_name: p.venue, street: p.street, city: p.city, state: p.state, zip: p.zip,
+        type: p.type, subtype: p.subtype, genre: p.genre, camping: p.camping,
+        cashless: form.rfid && form.rfid.enabled ? form.rfid.cashlessMode : "",
+        N: Number($("#attendance").value) || 0,
+        limit_registrations: p.limit_registrations,
+      },
+      ga_price: form.options.ticket,
+      tiers: form.options.tiers,
+      ros: ros,
+      mc: lastMC,
+      budget: lastBudget,
+      ledger: lastLedgerRows,
+    };
+  }
+
+  function currentDraft() {
+    return EventDraft.buildEventDraft(draftStateFromUi());
+  }
+
+  function updateCreateButtons() {
+    const btn = $("#btnCreateFree");
+    if (!btn || typeof EventDraft === "undefined") return;
+    const issues = [];
+    if (!rosGate || !rosGate.isConfirmed()) issues.push("Confirm the run of show (step 4).");
+    const v = EventDraft.validateEventDraft(currentDraft());
+    v.errors.forEach(function (e) { issues.push(e); });
+    btn.disabled = issues.length > 0;
+    const ul = $("#createEventIssues");
+    if (ul) ul.innerHTML = issues.map(function (i) { return "<li>" + escapeHtml(i) + "</li>"; }).join("");
+    const paid = $("#btnCreatePaid");
+    if (paid && typeof CreateEvent !== "undefined") paid.href = CreateEvent.config().PAID_EVENT_URL;
+  }
+
+  function autosave() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(function () {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(readForm())); } catch (e) { /* quota / private mode */ }
+      updateCreateButtons();
+    }, AUTOSAVE_MS);
+  }
+
+  async function onCreateFree() {
+    const btn = $("#btnCreateFree");
+    const status = $("#createEventStatus");
+    updateCreateButtons();
+    if (!btn || btn.disabled) return;
+    const draft = currentDraft();
+    try { localStorage.setItem(LS_KEY, JSON.stringify(readForm())); } catch (e) {}
+    btn.disabled = true;
+    if (status) status.textContent = "Sending draft to Patron Journey…";
+    try {
+      const r = await CreateEvent.createFreeEvent(draft);
+      if (status) {
+        status.textContent = r.mode === "anonymous"
+          ? "Draft saved. Finish sign-in / sign-up in the new tab to create your event."
+          : "Event created — opening your dashboard…";
+      }
+    } catch (err) {
+      if (status) status.textContent = "Could not create event: " + (err && err.message ? err.message : err) + ". Your inputs are still saved here.";
+      flash("Create event failed — inputs kept locally.", "warn");
+    } finally {
+      updateCreateButtons();
+    }
+  }
+
+  function wireEventDraft() {
+    const sidebar = document.querySelector(".sidebar");
+    const main = document.querySelector("main");
+    [sidebar, main].forEach(function (root) {
+      if (!root) return;
+      root.addEventListener("input", autosave);
+      root.addEventListener("change", autosave);
+      root.addEventListener("click", function (e) {
+        if (e.target && /^btnRos/.test(e.target.id || "")) setTimeout(updateCreateButtons, 0);
+      });
+    });
+    if ($("#btnCreateFree")) $("#btnCreateFree").addEventListener("click", onCreateFree);
+    try {
+      if (localStorage.getItem(LS_KEY)) loadDraft();
+    } catch (e) { /* ignore */ }
+    updateCreateButtons();
+  }
+  // ===== END event-draft.v1 / Create this event =====
+
   function init() {
     model = window.BUDGET_MODEL;
     festivals = Array.isArray(window.FESTIVALS) ? window.FESTIVALS : [];
@@ -1571,6 +1692,7 @@
     ensureSheetBaseline();
     // Product default: music focus on (changes live vs sheet). Use Reset / Reconcile for raw sheet.
     wire();
+    wireEventDraft();
     goAxStep(1);
     recalculate();
     flash(
