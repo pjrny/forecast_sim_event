@@ -20,10 +20,13 @@ const sandbox = { console, Math, Date };
 sandbox.window = sandbox;
 sandbox.global = sandbox;
 vm.createContext(sandbox);
-["js/ticket_tiers.js", "js/budget_engine.js", "js/monte_carlo.js", "js/ros_gate.js", "js/crowd_ban_filter.js", "js/crowd_bank.js", "js/event_draft.js"].forEach((f) =>
+["js/ticket_tiers.js", "js/budget_engine.js", "js/monte_carlo.js", "js/ros_gate.js", "js/crowd_ban_filter.js", "js/crowd_bank.js", "js/schema_lite.js", "js/event_draft_schema.js", "js/event_draft.js"].forEach((f) =>
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), sandbox)
 );
-const { TicketTiers, BudgetEngine, MonteCarlo, RosGate, CrowdBanFilter, CrowdBank, EventDraft } = sandbox;
+const { TicketTiers, BudgetEngine, MonteCarlo, RosGate, CrowdBanFilter, CrowdBank, EventDraft, SchemaLite } = sandbox;
+const CANON = JSON.parse(fs.readFileSync(path.join(root, "docs/event-draft.v1.schema.json"), "utf8"));
+const SRC = JSON.parse(fs.readFileSync(path.join(root, "docs/event-draft.v1.schema.SOURCE.json"), "utf8"));
+function canon(d) { return SchemaLite.validate(CANON, JSON.parse(JSON.stringify(d))); }
 const model = JSON.parse(fs.readFileSync(path.join(root, "budget_model.json"), "utf8"));
 const N0 = model.baseline.N0;
 const T = model.sheet_targets_at_N0;
@@ -53,7 +56,11 @@ if (!v.ok) console.error(v.errors);
 assert(v.ok, "default draft validates");
 assert(d.version === "event-draft.v1" && d.start === "2026-11-13T11:00" && d.end === "2026-11-15T23:30", "version + local ISO start/end no offset");
 assert(d.capacity === N0, "capacity = N when no limit (" + d.capacity + ")");
-assert(JSON.stringify(d.tags) === JSON.stringify(["Music", "Camping", "EDM", "camping", "cashless:hybrid"]), "tags type/subtype/genre/camping/cashless");
+assert(JSON.stringify(d.tags) === JSON.stringify(["Music", "Camping", "EDM", "Cashless hybrid"]), "tags type/subtype/genre/camping/cashless (schema-safe, deduped): " + JSON.stringify(d.tags));
+assert(JSON.stringify(sandbox.EVENT_DRAFT_SCHEMA) === JSON.stringify(CANON), "browser schema bundle ≡ docs/event-draft.v1.schema.json @" + SRC.commit.slice(0, 7));
+const e0 = canon(d);
+if (e0.length) console.error(e0);
+assert(e0.length === 0, "default N=" + N0 + " draft validates against CANONICAL schema");
 
 console.log("=== 2) GA ticket ===");
 assert(d.tickets[0].name === "GA – Pay at Door $199", "GA name '" + d.tickets[0].name + "'");
@@ -62,19 +69,23 @@ assert(d.tickets[0].price === 0 && d.tickets[0].max === N0, "GA price 0, max = c
 console.log("=== 3) VIP ===");
 assert(d.tickets.length === 1, "VIP omitted when absent");
 const dv = EventDraft.buildEventDraft(Object.assign({}, state, { tiers: { enabled: true, rows: [{ name: "GA", price: 199, qty: 7000 }, { name: "VIP", price: 349, qty: 888, max: 900 }] } }));
+assert(canon(dv).length === 0, "VIP variant validates against canonical schema " + JSON.stringify(canon(dv)));
 assert(dv.tickets.length === 2 && dv.tickets[1].name === "VIP – Pay at Door $349" && dv.tickets[1].price === 0 && dv.tickets[1].max === 900, "VIP present → '" + (dv.tickets[1] || {}).name + "' price 0");
 
 console.log("=== 4) Lineup ===");
 const actCount = sk.rows.filter((r) => ["first_set", "last_set"].includes(r.action)).length;
 assert(d.lineup.length === actCount && actCount > 0, "lineup has only act rows (" + d.lineup.length + "/" + sk.rows.length + " ROS rows)");
 assert(d.lineup.every((a) => a.name === ""), "auto-generated slots export name '' (no 'First set Day 1' placeholders)");
-assert(d.lineup.every((a) => a.stage && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(a.start) && a.end > a.start), "unnamed slots keep start/end/stage");
+assert(d.lineup.every((a) => !("stage" in a)), "lineup items carry only name/start/end (schema additionalProperties:false)");
+assert(d.lineup.every((a) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(a.start) && a.end > a.start), "unnamed slots keep start/end");
 const typed = sk.rows.map((r) => (r.action === "first_set" && r.day === 1 ? Object.assign({}, r, { note: "DJ Sunrise" }) : r));
 const dt = EventDraft.buildEventDraft(Object.assign({}, state, { ros: { confirmed: true, rows: typed } }));
 assert(dt.lineup.filter((a) => a.name === "DJ Sunrise").length === 1 && dt.lineup.filter((a) => a.name === "").length === actCount - 1, "organizer-typed name kept; other slots stay ''");
+assert(canon(dt).length === 0, "typed-act variant validates against canonical schema " + JSON.stringify(canon(dt)));
 assert(d.lineup[0].start === "2026-11-13T12:00" && d.lineup[0].end === "2026-11-13T13:00", "act start/end on correct show day");
 const withArtist = EventDraft.buildEventDraft(Object.assign({}, state, { ros: { confirmed: true, rows: sk.rows.concat([{ day: 2, time: "21:00", end_time: "22:30", artist: "Headliner X", area: "Main Stage", action: "set" }]) } }));
-assert(withArtist.lineup.some((a) => a.name === "Headliner X" && a.stage === "Main Stage" && a.end === "2026-11-14T22:30"), "artist row → name/stage/end");
+assert(withArtist.lineup.some((a) => a.name === "Headliner X" && a.end === "2026-11-14T22:30"), "artist row → name/end");
+assert(canon(withArtist).length === 0, "artist variant validates against canonical schema");
 assert(EventDraft.buildEventDraft(Object.assign({}, state, { ros: { confirmed: false, rows: sk.rows } })).lineup.length === 0, "unconfirmed ROS → empty lineup");
 
 console.log("=== 5) Limit Registrations ===");
@@ -88,6 +99,14 @@ const bad2 = EventDraft.validateEventDraft(EventDraft.buildEventDraft(Object.ass
 assert(!bad2.ok && bad2.errors.includes("start must be before end"), "start >= end rejected");
 const bad3 = EventDraft.validateEventDraft(EventDraft.buildEventDraft(Object.assign({}, state, { profile: Object.assign({}, profile, { N: 0 }) })));
 assert(!bad3.ok && bad3.errors.includes("capacity must be > 0"), "capacity 0 rejected");
+
+const own = canon(Object.assign({}, d, { owner: "x", email: "a@b.c" }));
+assert(own.length > 0, "canonical schema rejects owner/email fields (" + own.length + " errors)");
+const badTag = EventDraft.validateEventDraft(Object.assign({}, d, { tags: ["cashless:hybrid"] }));
+assert(!badTag.ok && badTag.errors.some((e) => /tags\[0\]/.test(e)), "validateEventDraft enforces canonical tag pattern");
+const outside = EventDraft.validateEventDraft(Object.assign({}, d, { lineup: [{ name: "Late", start: "2026-11-16T01:00", end: "2026-11-16T02:00" }] }));
+assert(!outside.ok && outside.errors.some((e) => /inside event/.test(e)), "set outside event window rejected");
+assert(!("publish" in d), "draft never carries publish");
 
 console.log("=== 7) Forecast D1-only ===");
 assert(d.forecast._storage === "d1_only" && d.forecast.p50 === mc.P50 && d.forecast.p_profit === mc.pProfit && Math.abs(d.forecast.break_even_ticket - T.K2) <= 0.01, "forecast p10/p50/p90/p_profit/break_even present, d1_only");
@@ -108,10 +127,12 @@ console.log("=== 9) Mock Worker round trip ===");
   const w = await start(0);
   try {
     let opened = null;
-    const r1 = await CE.createFreeEvent(d, { WORKER_BASE: w.url }, { fetch, open: (u) => (opened = u) });
+    assert(CE.DEFAULTS.WORKER_BASE === "https://events-patronjourney.message-0ad.workers.dev", "default WORKER_BASE = live Worker");
+    const r1 = await CE.createFreeEvent(Object.assign({}, d, { publish: true }), { WORKER_BASE: w.url }, { fetch, open: (u) => (opened = u) });
     assert(r1.mode === "anonymous" && /\/claim\?draft=drf_\w+&t=\w+/.test(opened), "anon POST /api/drafts → window.open claim URL");
     const claim = await fetch(opened);
     assert(claim.status === 200, "claim URL accepted by mock (200)");
+    assert(w.store.lastBodies.every((b) => !("publish" in b)), "publish:true stripped before POST (events stay unpublished)");
     const bad = await fetch(w.url + "/claim?draft=" + r1.draft_id + "&t=nope");
     assert(bad.status === 403, "wrong claim token → 403");
     let redirected = null;
@@ -119,6 +140,7 @@ console.log("=== 9) Mock Worker round trip ===");
     const r2 = await CE.createFreeEvent(d, { WORKER_BASE: w.url, SAME_ORIGIN_SIGNED_IN: true }, { fetch: authFetch, redirect: (u) => (redirected = u) });
     assert(r2.mode === "signed_in" && redirected === "/organizer/events/" + r2.odoo_event_id, "signed-in drafts → create → redirect dashboard_url");
     const ev = w.store.events[0];
+    assert(w.store.lastBodies.every((b) => !("publish" in b)), "no request body (drafts or /create) contains publish");
     assert(ev && !("forecast" in ev.odoo) && ev.d1_forecast && ev.odoo.tickets.every((t) => t.price === 0), "mock Odoo payload has no forecast; tickets $0");
     let rejected = false;
     try { await CE.createFreeEvent(Object.assign({}, d, { venue: {} }), { WORKER_BASE: w.url }, { fetch, open: () => {} }); } catch (e) { rejected = e.status === 422; }

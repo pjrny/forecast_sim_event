@@ -61,18 +61,18 @@ At the end of the flow (step 7) there are two buttons:
 | `name`, `start`/`end` (local `YYYY-MM-DDTHH:mm`, no offset), `timezone` | wizard profile (+ start/end time) | `name`, `date_begin`/`date_end`, `date_tz` |
 | `venue{name,street,city,state,zip}` | wizard | address partner |
 | `capacity` | Limit Registrations if set, else N | `seats_max` |
-| `tags` | type, subtype, genre, camping, cashless mode | `tag_ids` |
+| `tags` | type, subtype, genre, `Camping`, `Cashless <mode>`, sanitized to the schema pattern and deduped case-insensitively | `tag_ids` |
 | `tickets` | `GA – Pay at Door $<GA price>` price 0, max = capacity; `VIP – Pay at Door $<price>` only if a VIP tier exists | event tickets ($0) |
-| `lineup[{name,start,end,stage}]` | **act rows only** of the confirmed ROS (`first_set`/`last_set`/`set`/`act`/`headliner`, `kind:"act"` or `artist`) | tracks (`name` is `''` for auto-generated slots like "First set Day 1"; only organizer-typed names are sent) |
+| `lineup[{name,start,end}]` (no `stage`: canonical schema forbids extra keys; sets must fall inside start..end) | **act rows only** of the confirmed ROS (`first_set`/`last_set`/`set`/`act`/`headliner`, `kind:"act"` or `artist`) | tracks (`name` is `''` for auto-generated slots like "First set Day 1"; only organizer-typed names are sent) |
 | `forecast{p10,p50,p90,p_profit,break_even_ticket,pnl_by_dept,assumption_ledger}` | MC + engine + ledger | **D1 only, never Odoo** (`odooFields()` strips it) |
 
-Placeholder schema: `docs/event-draft.v1.local.json`, to be replaced by the organizer repo's canonical `event-draft.v1.json`.
+Canonical schema: `docs/event-draft.v1.schema.json` + `docs/EVENT_DRAFT.md`, copied from `pjrny/Events-Patron-Journey-Organizer@5e5ce44` (see `docs/event-draft.v1.schema.SOURCE.json`). `validateEventDraft()` runs local rules **and** the canonical schema (`js/schema_lite.js`, zero-dep). After re-fetching the schema, run `node scripts/sync_schema.js` to regenerate the browser bundle `js/event_draft_schema.js`.
 
 **Transport** (`js/create_event.js`, no cookies):
 
 ```js
 window.FORECASTER_CONFIG = {
-  WORKER_BASE: "https://<organizer worker>",   // default "" = same origin
+  WORKER_BASE: "https://events-patronjourney.message-0ad.workers.dev", // default ("" = same origin)
   SAME_ORIGIN_SIGNED_IN: false,                 // true when served as the Worker's Simulate tab
   PAID_EVENT_URL: "https://www.pjrny.com/#Contact-us",
 };
@@ -91,3 +91,5 @@ window.FORECASTER_CONFIG = {
 ## Branch
 
 `v1.4-event-draft` (from `v1.3-accuracy-ux`)
+
+Events are always created **unpublished**: the client strips any `publish` key and calls `/create` with `{}`. Publish from the dashboard.

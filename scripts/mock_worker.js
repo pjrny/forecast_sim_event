@@ -15,7 +15,7 @@ const path = require("path");
 const ED = require(path.join(__dirname, "..", "js", "event_draft.js"));
 
 function start(port) {
-  const store = { drafts: new Map(), events: [] };
+  const store = { drafts: new Map(), events: [], lastBodies: [] };
   let nextEvent = 1000;
   const send = (res, code, obj, type) => {
     res.writeHead(code, {
@@ -26,7 +26,7 @@ function start(port) {
     });
     res.end(typeof obj === "string" ? obj : JSON.stringify(obj));
   };
-  const body = (req) => new Promise((ok) => { let s = ""; req.on("data", (c) => (s += c)); req.on("end", () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { ok(null); } }); });
+  const body = (req) => new Promise((ok) => { let s = ""; req.on("data", (c) => (s += c)); req.on("end", () => { let v = null; try { v = s ? JSON.parse(s) : {}; } catch (e) {} if (v) store.lastBodies.push(v); ok(v); }); });
   const authed = (req) => /^Bearer\s+\S+/.test(req.headers.authorization || "") || req.headers["x-mock-session"] === "1";
 
   const server = http.createServer(async (req, res) => {
@@ -39,7 +39,7 @@ function start(port) {
       const id = "drf_" + crypto.randomBytes(6).toString("hex");
       const tok = crypto.randomBytes(16).toString("hex");
       store.drafts.set(id, { draft: d, claim_token: tok, owner: null, created: Date.now(), expires: Date.now() + 7 * 864e5 });
-      return send(res, 201, { draft_id: id, claim_token: tok });
+      return send(res, 201, { draft_id: id, claim_token: tok, expires_at: new Date(Date.now() + 7 * 864e5).toISOString(), claim_url: "http://" + req.headers.host + "/claim?draft=" + id + "&t=" + tok });
     }
     if (req.method === "GET" && u.pathname === "/claim") {
       const r = store.drafts.get(u.searchParams.get("draft"));
@@ -62,10 +62,11 @@ function start(port) {
         if (!r) return send(res, 404, { error: "not found" });
         if (req.method === "GET" && !m[2]) return send(res, 200, r.draft);
         if (req.method === "POST" && m[2]) {
+          await body(req); // record /create body (must not carry publish)
           const odoo = ED.odooFields(r.draft);
           odoo.tickets = (odoo.tickets || []).map((t) => Object.assign({}, t, { price: 0 }));
           const id = nextEvent++;
-          store.events.push({ id, odoo, d1_forecast: r.draft.forecast || null });
+          store.events.push({ id, odoo, d1_forecast: r.draft.forecast || null, published: false });
           return send(res, 200, { odoo_event_id: id, dashboard_url: "/organizer/events/" + id, public_url: "/event/" + id });
         }
       }

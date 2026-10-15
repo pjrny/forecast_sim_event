@@ -6,8 +6,8 @@
  * Odoo-bound: name, start, end, timezone, venue, capacity, tags, tickets, lineup.
  * D1-only: forecast.* (never sent to Odoo; Worker stores alongside the draft).
  *
- * PLACEHOLDER contract: docs/event-draft.v1.local.json until Event bot
- * publishes the canonical schema in the organizer repo.
+ * Canonical contract: docs/event-draft.v1.schema.json (copied from
+ * pjrny/Events-Patron-Journey-Organizer; see docs/event-draft.v1.schema.SOURCE.json).
  */
 (function (global) {
   "use strict";
@@ -42,6 +42,17 @@
     var dt = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5] + mins));
     return dt.getUTCFullYear() + "-" + pad(dt.getUTCMonth() + 1) + "-" + pad(dt.getUTCDate()) +
       "T" + pad(dt.getUTCHours()) + ":" + pad(dt.getUTCMinutes());
+  }
+
+  // canonical tag rule: ^[\p{L}\p{N} &'/+.-]+$, 1–40 chars, unique, ≤15
+  function cleanTags(list) {
+    var out = [], seen = {};
+    (list || []).forEach(function (t) {
+      var v = str(t).replace(/[^\p{L}\p{N} &'\/+.\-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 40).trim();
+      var k = v.toLowerCase();
+      if (v && !seen[k] && out.length < 15) { seen[k] = 1; out.push(v); }
+    });
+    return out;
   }
 
   function money(n) {
@@ -98,7 +109,8 @@
         name: actName(r),
         start: start,
         end: end,
-        stage: str(r.stage) || str(r.area) || "Main",
+        // canonical schema: lineup items allow only {name,start,end} (additionalProperties:false);
+        // stage/area stays in the D1 forecast ROS, not the Odoo payload.
       };
     });
     return acts.filter(function (a) { return a.start; })
@@ -118,18 +130,16 @@
     state = state || {};
     var p = state.profile || {};
     var capacity = capacityOf(p);
-    var tags = [p.type, p.subtype, p.genre,
-      p.camping ? "camping" : "", p.cashless ? "cashless:" + str(p.cashless) : ""]
-      .map(str).filter(Boolean);
+    var tags = cleanTags([p.type, p.subtype, p.genre,
+      p.camping ? "Camping" : "", p.cashless ? "Cashless " + str(p.cashless) : ""]);
 
     var tickets = [{ name: "GA – Pay at Door $" + money(state.ga_price), price: 0, max: capacity }];
     var vip = findVip(state.tiers);
     if (vip) {
-      tickets.push({
-        name: str(vip.name) + " – Pay at Door $" + money(vip.price),
-        price: 0,
-        max: Number(vip.max) > 0 ? Number(vip.max) : (Number(vip.qty) > 0 ? Number(vip.qty) : null),
-      });
+      var vmax = Math.floor(Number(vip.max) > 0 ? Number(vip.max) : Number(vip.qty) || 0);
+      var vt = { name: str(vip.name) + " – Pay at Door $" + money(vip.price), price: 0 };
+      if (vmax >= 1) vt.max = vmax; // schema: integer ≥ 1 or omitted
+      tickets.push(vt);
     }
 
     var mc = state.mc || null;
@@ -168,6 +178,13 @@
     };
   }
 
+  function safeRequire(p) {
+    try { return typeof require === "function" ? require(p) : null; } catch (e) { return null; }
+  }
+  function loadSchema() {
+    return safeRequire("../docs/event-draft.v1.schema.json") || (safeRequire("./event_draft_schema.js") || {}).schema || null;
+  }
+
   function validateEventDraft(d) {
     var errors = [];
     if (!d || typeof d !== "object") return { ok: false, errors: ["draft missing"] };
@@ -183,6 +200,7 @@
       if (!str(v[k])) errors.push("venue." + k + " required");
     });
     if (!(Number(d.capacity) > 0)) errors.push("capacity must be > 0");
+    else if (Number(d.capacity) > 100000) errors.push("capacity must be <= 100000");
     (d.tickets || []).forEach(function (t, i) {
       if (!str(t.name)) errors.push("tickets[" + i + "].name required");
       if (Number(t.price) !== 0) errors.push("tickets[" + i + "].price must be 0 (pay at door)");
@@ -190,7 +208,16 @@
     (d.lineup || []).forEach(function (a, i) {
       if (a.name == null || typeof a.name !== "string") errors.push("lineup[" + i + "].name must be a string ('' = unnamed slot)");
       if (!re.test(a.start || "") || !re.test(a.end || "")) errors.push("lineup[" + i + "] times invalid");
+      else if (a.start < d.start || a.end > d.end || !(a.start < a.end)) errors.push("lineup[" + i + "] must fall inside event start..end");
     });
+    // Canonical schema (organizer repo) — authoritative shape check
+    var schema = global.EVENT_DRAFT_SCHEMA || loadSchema();
+    var Lite = global.SchemaLite || safeRequire("./schema_lite.js");
+    if (schema && Lite) {
+      Lite.validate(schema, d).forEach(function (e) { errors.push("schema " + e); });
+    } else {
+      errors.push("canonical schema not loaded");
+    }
     return { ok: errors.length === 0, errors: errors };
   }
 
