@@ -230,3 +230,59 @@ tr.addon-row.total td { border-top: 1px dashed var(--accent); }
 .debrief-list { margin: 0.5rem 0 0.75rem; padding-left: 1.1rem; }
 .debrief-list li { margin-bottom: 0.65rem; }
 .debrief-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+
+/* ===== v1.3 AX stepper + sticky KPIs ===== */
+.app-header { flex-wrap: wrap; }
+.header-kpis {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+  flex: 1; justify-content: center;
+}
+.header-kpis .hk {
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.25rem 0.55rem; min-width: 5.5rem; text-align: center;
+}
+.header-kpis .hk-l {
+  display: block; font-size: 0.62rem; color: var(--cyan); font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+.header-kpis .hk-v {
+  font-size: 0.85rem; font-weight: 650; font-variant-numeric: tabular-nums;
+}
+.live-delta-banner { border-color: #eab308 !important; background: #713f1255 !important; color: #fde68a !important; }
+
+.ax-stepper {
+  display: flex; flex-wrap: wrap; gap: 0.35rem;
+  padding: 0.65rem 1.5rem; border-bottom: 1px solid var(--border);
+  background: var(--bg2); position: sticky; top: 64px; z-index: 15;
+}
+.ax-step {
+  font-size: 0.75rem; padding: 0.35rem 0.65rem;
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.ax-step.active {
+  background: linear-gradient(135deg, #78350f55, #5b21b655);
+  border-color: var(--accent); color: var(--text); font-weight: 600;
+}
+.ax-nav {
+  display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 1rem;
+  padding-top: 0.75rem; border-top: 1px solid var(--border);
+}
+.event-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem;
+  background: var(--bg2); margin-bottom: 0.75rem;
+}
+details.addon-acc {
+  margin: 0.65rem 0; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg2); padding: 0.35rem 0.65rem;
+}
+details.addon-acc summary {
+  cursor: pointer; color: var(--accent2); font-size: 0.82rem;
+  text-transform: uppercase; letter-spacing: 0.05em; padding: 0.35rem 0;
+}
+details.addon-acc[open] summary { margin-bottom: 0.5rem; }
+table.ledger { font-size: 0.78rem; }
+@media (max-width: 980px) {
+  .ax-stepper { top: auto; position: relative; }
+  .header-kpis { order: 3; width: 100%; justify-content: flex-start; }
+}

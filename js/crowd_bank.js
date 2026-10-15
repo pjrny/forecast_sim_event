@@ -101,6 +101,20 @@
     /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, // phone-like doxx
   ];
 
+  function safeRequire(p) {
+    try { return require(p); } catch (e) { return null; }
+  }
+
+  /**
+   * Accept server-generated lines (Worker, from private R2 sources) only if they
+   * pass the shared ban filter; otherwise fall back to the curated bank.
+   */
+  function acceptGenerated(lines, count, rng, opts, ctx) {
+    var ok = (lines || []).filter(filterBanned);
+    if (ok.length >= count) return ok.slice(0, count);
+    return ok.concat(pickLines(rng || Math.random, count - ok.length, opts, ctx));
+  }
+
   function filterBanned(line) {
     if (!line || typeof line !== "string") return false;
     var s = line.trim();
@@ -108,6 +122,9 @@
     for (var i = 0; i < BANNED_PATTERNS.length; i++) {
       if (BANNED_PATTERNS[i].test(s)) return false;
     }
+    // Shared rules (same module the organizer Worker uses for generated lines)
+    var shared = global.CrowdBanFilter || (typeof require === "function" ? safeRequire("./crowd_ban_filter.js") : null);
+    if (shared && !shared.isAllowed(s)) return false;
     return true;
   }
 
@@ -161,6 +178,7 @@
     curatedBank: curatedBank,
     fillTemplate: fillTemplate,
     pickLines: pickLines,
+    acceptGenerated: acceptGenerated,
     anonHandle: anonHandle,
   };
 })(typeof window !== "undefined" ? window : global);

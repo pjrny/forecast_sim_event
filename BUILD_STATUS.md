@@ -1,30 +1,36 @@
-# Festival Forecaster v1.2 — BUILD_STATUS
+# Festival Forecaster v1.3 — BUILD_STATUS
 
 **Date:** 2026-09-15  
-**Status:** Usable SPA + engine PASS at N=7888 + RFID + Safety/Weather + multi-tab blank `.xlsx` pack + **Phase 2 MC journey presentation (ROS gate)**
+**Status:** **v1.3 PASS** — Accuracy then UX (branch `v1.3-accuracy-ux`)
 
 ## What works
 
-- Deterministic P&L from `budget_model.json` (`js/budget_engine.js`)
-  - fixed / per_ticket / hybrid venue / sales_tax C80 / **C54 = 0.03×K22 dynamic**
-  - K2 be_rate rollups; K22 camper/non-camper; K24 / K30 / K47
-  - Ancillaries scale N/N0 (overridable); wizard modifiers after base; marketing % slider + hard cap
-- **Node self-test PASS:** `node scripts/verify_engine.js` — all dollar cells within $1 of `sheet_targets_at_N0`
-- UI **Reconcile at N=7888** button (same targets)
-- Monte Carlo 5000 draws, presets, P10/P50/P90, tornado, one plain sentence
-- **Phase 2 journey presentation**
-  - ROS gate: Use my ROS | Generate skeleton → Confirm | Edit | Cancel
-  - Run Monte Carlo **disabled** until Confirm ROS
-  - Journey rail (10 stages; camping hidden when off) + OPS + CROWD feeds, pause/scrub, 20–40s clock
-  - Numbers first, then optional Replay P10/P50/P90 + debrief
-  - Curated `js/crowd_bank.js` (no confession xlsx); `filterBanned()`
-  - Health-protocol intensity toggle default OFF (ESA 6ft / 100.4F / 14-day only when ON)
-- Competitors wired to **full** `festivals.json` (26,780) via **fetch** + `CompetitorScore.topN`
-- SVG poster download (no fake headliners)
-- **v1.1 blank pack:** SheetJS CDN → multi-tab `.xlsx` workbooks
-- localStorage drafts
-- **RFID / Cashless** optional add-on — `node scripts/verify_rfid.js`
-- **Safety / Weather** optional add-on — `node scripts/verify_safety_weather.js`
+- Deterministic P&L from `budget_model.json` (`js/budget_engine.js` core math unchanged)
+- **Ticket tiers** (`js/ticket_tiers.js`) — default reconstruct K22 from K7/K6/K8; qty≠N blocks MC; max/window → MC only
+- **Limit Registrations** — caps wizard N and MC attendance draws; off = no change
+- **Sponsors / Booths** (`js/sponsors_booths.js`) — off ⇒ G3/K47 unchanged; on ⇒ income + optional site cost outside G3
+- **Assumption ledger** + **Reset to sheet N=7888**
+- Marketing slider labeled **ASSUMPTION / not G6:G33**
+- AX stepper (Profile → Tickets → Prep → ROS → Numbers → Competitors → Pack)
+- Sticky KPIs K22/G3/K24/K47; yellow live≠sheet banner
+- Pack: blank `.xlsx` + **`odoo_event_import.csv`**
+- RFID / SafetyWeather outside G3 when OFF; ROS gate still required before MC
+
+## TEST PLAN results
+
+| Check | Result |
+|-------|--------|
+| verify_engine PASS | **PASS** |
+| verify_rfid PASS | **PASS** |
+| verify_safety_weather PASS | **PASS** |
+| verify_tiers PASS | **PASS** |
+| Reconcile N=7888 PASS all addons OFF | **PASS** |
+| Default tiers reconstruct K22 | **PASS** (1971593.768 ≡ sheet) |
+| Limit Registrations caps MC | **PASS** (max N=5000 when capped) |
+| Sponsors off ⇒ K47 unchanged | **PASS** |
+| ROS still blocks Run | **PASS** (unchanged gate) |
+| Reset-to-sheet restores raw KPIs | **PASS** (baselineMode + empty wizard) |
+| Pack downloads include CSV | **PASS** (`buildOdooEventImportCsv` / `downloadAll`) |
 
 ## How to open
 
@@ -33,27 +39,71 @@ cd /workspace/forecast_sim_event && python3 -m http.server 4173
 # open http://127.0.0.1:4173/
 ```
 
-## Gaps / notes
-
-- Default wizard (music focus on, camping on, marketing 16% of opex) **changes** live P&L vs raw sheet; use Reconcile button for baseline PASS table.
-- Directory dates are mostly 2017–2022 → nearly all matches show stale label (expected).
-- ESA / safety sheets are **blank checklists** — not a safety plan and not legal advice.
-- Crowd feed is color/narrative only; it does not drive P&L unless echoing an already-applied shock.
-- No login / multi-app / SaaS.
-
-## Paths created/updated (v1.2)
+## Paths created/updated (v1.3)
 
 ```
-js/ros_gate.js
-js/crowd_bank.js
-js/ops_bank.js
-js/mc_presentation.js
-js/monte_carlo.js          (pickRepresentativeDraw / drawsDetail — math unchanged)
-js/app.js                  (ROS gate + journey wiring)
-index.html
-css/app.css
+js/ticket_tiers.js          (new)
+js/sponsors_booths.js       (new)
+scripts/verify_tiers.js     (new)
+js/budget_engine.js         (sponsors additive only — core math untouched)
+js/monte_carlo.js           (limit + tier max/window ASSUMPTION)
+js/templates.js             (odoo_event_import.csv)
+js/app.js                   (tiers, sponsors, ledger, AX stepper)
+index.html                  (AX stepper chrome)
+css/app.css                 (stepper + sticky KPIs)
 README.md
 BUILD_STATUS.md
 ```
 
-Prior v1.1 paths unchanged: engine, RFID, safety_weather, templates, festivals.json, verify_*.js.
+## K22 default match
+
+At N=7888, default tiers (K14/K19 all-in × K8 mix): **1971593.768** ≡ `sheet_targets_at_N0.K22`.
+
+
+---
+
+# v1.4 — event-draft.v1 / Create this event
+
+Branch `v1.4-event-draft` (based on local `v1.3-accuracy-ux` tip b2ee6f6).
+
+| Check | Result |
+|---|---|
+| Wizard: venue name, street, city, state, ZIP, timezone (IANA select, default America/Chicago), start/end time, genre | **DONE** |
+| `buildEventDraft` / `validateEventDraft` / `odooFields` | **PASS** (`verify_event_draft.js`) |
+| Default N=7888 draft validates; K22/G3 ≡ sheet | **PASS** |
+| GA `GA – Pay at Door $199`, price 0, max = capacity | **PASS** |
+| VIP omitted when absent / included when tier exists | **PASS** |
+| Lineup = act rows of confirmed ROS only | **PASS** (6 of 16 skeleton rows) |
+| Capacity uses Limit Registrations | **PASS** |
+| Ban filter blocks doxx/drug how-to/minors/OD wishes/slur/real names; 70 curated lines pass | **PASS** |
+| Mock Worker: anon draft → claim URL; signed-in → create → dashboard_url; 401/403/422 paths | **PASS** |
+| Browser smoke (headless Chrome + mock Worker): button disabled until valid, enables after fill+ROS confirm, claim tab opened, no cookies, autosave restores after reload | **PASS** |
+| Existing verify_engine / rfid / safety_weather / tiers + reconcile.py | **PASS** (Master Budget N=7888 unchanged) |
+
+## Gaps
+- Real Worker endpoints aren't live yet, so the flow has only been tested against `scripts/mock_worker.js`.
+- Auto-generated ROS act slots export `name: ''` (times kept). The Worker skips blank-name rows and creates a default track if none are named.
+- Festival directory → D1 and R2-backed generation are on the Worker side and not part of this repo.
+
+## Paths (v1.4)
+```
+js/event_draft.js            (new)
+js/create_event.js           (new)
+js/crowd_ban_filter.js       (new)
+js/crowd_bank.js             (uses shared filter; acceptGenerated)
+js/app.js                    (venue fields, autosave/restore, Create buttons)
+index.html                   (wizard fields, step-7 Create box)
+docs/event-draft.v1.schema.json (canonical copy @5e5ce44) + EVENT_DRAFT.md + .SOURCE.json
+js/schema_lite.js            (new, zero-dep JSON Schema subset)
+js/event_draft_schema.js     (generated by scripts/sync_schema.js)
+scripts/mock_worker.js       (new)
+scripts/verify_event_draft.js (new)
+```
+
+## v1.4 schema alignment (canonical @ pjrny/Events-Patron-Journey-Organizer 5e5ce44)
+- `lineup[].stage` removed (schema additionalProperties:false).
+- Tags: `camping` → `Camping`, `cashless:hybrid` → `Cashless hybrid` (':' not allowed by pattern); deduped case-insensitively, ≤40 chars, ≤15 tags.
+- `tickets[].max` omitted when unknown (schema: integer ≥1, null not allowed).
+- `capacity` ≤ 100000; lineup sets must fall inside start..end.
+- Default `WORKER_BASE` = https://events-patronjourney.message-0ad.workers.dev; `publish` is never sent (events stay unpublished).
+- Live signed-out smoke (2026-10-14 7:50 PM CT): `POST /api/drafts` → 201 `{draft_id, claim_token, expires_at, claim_url}`, CORS allow-origin www.pjrny.com; `/claim` → 200 sign-in page. /create was not called.
